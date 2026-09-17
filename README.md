@@ -153,7 +153,7 @@ Copy the template file to `.env`:
 cp backend/.env.example backend/.env
 ```
 Key variables:
-- `FRONTEND_ORIGIN`: Allowed origins for CORS (e.g., `https://railblock-advisor.vercel.app` or `http://localhost:5173`). Supports comma-separated origins.
+- `FRONTEND_ORIGIN`: Allowed origins for CORS (e.g., `https://railblock-advisor-frontend.vercel.app` or `http://localhost:5173`). Supports comma-separated origins.
 - `HOST`: Server host binding (default: `0.0.0.0`).
 - `PORT`: Server port (default: `8000`).
 - `CORS_ALLOW_ALL`: Set to `false` for production, `true` for unrestricted local testing.
@@ -164,27 +164,27 @@ Copy the template file to `.env`:
 cp frontend/.env.example frontend/.env
 ```
 Key variables:
-- `VITE_API_BASE_URL`: URL of the deployed FastAPI backend (e.g., `https://api-railblock.onrender.com`). If unset, defaults to `http://localhost:8000`.
+- `VITE_API_BASE_URL`: URL of the deployed FastAPI backend (e.g., `https://railblock-advisor.onrender.com`). If unset in dev, defaults to `http://localhost:8000`. In production, defaults to `https://railblock-advisor.onrender.com`.
 
 ---
 
 ### Production Deployment Instructions
 
-#### 1. Backend Deployment (Render, Railway, Fly.io, or AWS EC2)
-- **Runtime**: Python 3.9+
+#### 1. Backend Deployment (Render)
+- **Runtime**: Python 3.10+
 - **Build Command**: `pip install -r requirements.txt && python seed_data.py`
 - **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
 - **Environment Variables**:
-  - `FRONTEND_ORIGIN`: Your deployed frontend domain (e.g., `https://railblock-advisor.vercel.app`).
+  - `FRONTEND_ORIGIN`: `https://railblock-advisor-frontend.vercel.app,http://localhost:5173`
   - `CORS_ALLOW_ALL`: `false`
 
-#### 2. Frontend Deployment (Vercel, Netlify, or Cloudflare Pages)
+#### 2. Frontend Deployment (Vercel)
 - **Framework Preset**: Vite
 - **Root Directory**: `frontend`
 - **Build Command**: `npm run build`
 - **Output Directory**: `dist`
 - **Environment Variables**:
-  - `VITE_API_BASE_URL`: Your deployed backend URL (e.g., `https://api-railblock.onrender.com`).
+  - `VITE_API_BASE_URL`: `https://railblock-advisor.onrender.com`
 
 ---
 

@@ -241,3 +241,18 @@ def import_demo_tasks(db: Session = Depends(get_db)):
         "total_active": imported_count + updated_count,
         "data_label": "DEMO DATA"
     }
+
+# Alias router for /api/requests -> Maintenance Tasks
+requests_router = APIRouter(prefix="/api/requests", tags=["Maintenance Requests"])
+
+@requests_router.get("", response_model=List[MaintenanceTaskResponse])
+def get_all_requests_alias(
+    department: Optional[str] = Query(None, description="Filter by department (Engineering, S&T, Traction)"),
+    status: Optional[str] = Query(None, description="Filter by status (Pending, Scheduled, Deferred, etc.)"),
+    location: Optional[str] = Query(None, description="Filter by section location"),
+    criticality: Optional[str] = Query(None, description="Filter by criticality level"),
+    overdue: Optional[bool] = Query(None, description="Filter by overdue status"),
+    db: Session = Depends(get_db)
+):
+    return get_all_tasks(department, status, location, criticality, overdue, db)
+

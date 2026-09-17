@@ -29,6 +29,7 @@ class RejectionRequest(BaseModel):
     reason: str = Field(..., min_length=5, description="Technical reason for plan rejection")
 
 @router.post("/api/optimization/generate", status_code=status.HTTP_200_OK)
+@router.post("/api/optimisation/generate", status_code=status.HTTP_200_OK)
 def generate_optimization_plans(
     req: Optional[PlanGenerateRequest] = None,
     db: Session = Depends(get_db)
@@ -144,6 +145,9 @@ def generate_optimization_plans(
     }
 
 @router.get("/api/optimization/plans")
+@router.get("/api/optimisation/plans")
+@router.get("/api/optimisation")
+@router.get("/api/plans")
 def list_optimization_plans(db: Session = Depends(get_db)):
     plans = db.query(SchedulePlan).order_by(SchedulePlan.created_at.desc()).all()
     if not plans:
@@ -174,6 +178,8 @@ def list_optimization_plans(db: Session = Depends(get_db)):
     ]
 
 @router.get("/api/optimization/plans/{plan_id}")
+@router.get("/api/optimisation/plans/{plan_id}")
+@router.get("/api/plans/{plan_id}")
 def get_optimization_plan_detail(plan_id: str, db: Session = Depends(get_db)):
     plan = db.query(SchedulePlan).filter(SchedulePlan.plan_id == plan_id).first()
     if not plan:

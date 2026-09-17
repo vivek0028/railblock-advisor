@@ -295,3 +295,56 @@ def test_audit_logs():
     logs = res.json()
     assert len(logs) > 0
     assert any(log["action"] in ["Plan Approved", "Optimisation Plan Generated", "Task Created"] for log in logs)
+
+# 13. Deployment API Route Aliases & CORS Verification
+def test_deployment_and_route_aliases():
+    # 1. /api/health and /health
+    res_api_health = client.get("/api/health")
+    assert res_api_health.status_code == 200
+    assert res_api_health.json()["status"] == "healthy"
+
+    res_health = client.get("/health")
+    assert res_health.status_code == 200
+    assert res_health.json()["status"] == "healthy"
+
+    # 2. /api/overview
+    res_overview = client.get("/api/overview")
+    assert res_overview.status_code == 200
+    assert "kpis" in res_overview.json()
+
+    # 3. /api/requests
+    res_requests = client.get("/api/requests")
+    assert res_requests.status_code == 200
+    assert isinstance(res_requests.json(), list)
+
+    # 4. /api/plans
+    res_plans = client.get("/api/plans")
+    assert res_plans.status_code == 200
+    assert isinstance(res_plans.json(), list)
+
+    # 5. /api/conflicts
+    res_conflicts = client.get("/api/conflicts")
+    assert res_conflicts.status_code == 200
+    assert isinstance(res_conflicts.json(), list)
+
+    # 6. /api/optimisation
+    res_opt = client.get("/api/optimisation")
+    assert res_opt.status_code == 200
+    assert isinstance(res_opt.json(), list)
+
+    # 7. /api/audit
+    res_audit = client.get("/api/audit")
+    assert res_audit.status_code == 200
+    assert isinstance(res_audit.json(), list)
+
+    # 8. CORS Verification for Vercel production frontend
+    cors_res = client.options(
+        "/api/dashboard/summary",
+        headers={
+            "Origin": "https://railblock-advisor-frontend.vercel.app",
+            "Access-Control-Request-Method": "GET"
+        }
+    )
+    assert cors_res.status_code == 200
+    assert cors_res.headers.get("access-control-allow-origin") == "https://railblock-advisor-frontend.vercel.app"
+

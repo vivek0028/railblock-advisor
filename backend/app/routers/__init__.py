@@ -1,5 +1,5 @@
 from app.routers.health import router as health_router
-from app.routers.tasks import router as tasks_router
+from app.routers.tasks import router as tasks_router, requests_router
 from app.routers.movements import router as movements_router
 from app.routers.block_windows import router as block_windows_router
 from app.routers.resources import router as resources_router
@@ -10,11 +10,12 @@ from app.routers.simulation import router as simulation_router
 from app.routers.compatibility import router as compatibility_router
 from app.routers.priority import router as priority_router
 from app.routers.dashboard import router as dashboard_router
-from app.routers.audit import router as audit_router
+from app.routers.audit import router as audit_router, audit_alias_router
 
 __all__ = [
     "health_router",
     "tasks_router",
+    "requests_router",
     "movements_router",
     "block_windows_router",
     "resources_router",
@@ -25,5 +26,7 @@ __all__ = [
     "compatibility_router",
     "priority_router",
     "dashboard_router",
-    "audit_router"
+    "audit_router",
+    "audit_alias_router"
 ]
+

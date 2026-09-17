@@ -14,6 +14,7 @@ from app.models.models import (
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard Summary"])
 
 @router.get("/summary")
+@router.get("/overview")
 def get_dashboard_summary(db: Session = Depends(get_db)):
     tasks = db.query(MaintenanceTask).all()
     blocks = db.query(BlockWindow).all()

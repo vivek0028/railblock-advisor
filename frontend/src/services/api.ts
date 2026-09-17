@@ -10,10 +10,24 @@ import {
   CompatibilityBundle
 } from "../types";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:8000";
+const getApiBaseUrl = (): string => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
+  if (typeof envUrl === "string" && envUrl.trim() !== "") {
+    return envUrl.trim().replace(/\/+$/, "");
+  }
+  // Local development fallback
+  if (import.meta.env.DEV) {
+    return "http://localhost:8000";
+  }
+  // Production deployment fallback
+  return "https://railblock-advisor.onrender.com";
+};
+
+const API_BASE = getApiBaseUrl();
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE}${url}`, {
+  const cleanPath = url.startsWith("/") ? url : `/${url}`;
+  const response = await fetch(`${API_BASE}${cleanPath}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
@@ -37,7 +51,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Health
-  getHealth: () => fetchJson<{ status: string; mode: string }>("/health"),
+  getHealth: () => fetchJson<{ status: string; mode?: string }>("/api/health"),
 
   // Dashboard
   getDashboardSummary: () => fetchJson<DashboardSummary>("/api/dashboard/summary"),
