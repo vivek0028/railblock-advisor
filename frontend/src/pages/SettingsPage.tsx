@@ -24,7 +24,7 @@ export const SettingsPage: React.FC = () => {
   const handleRecalculatePriorities = async () => {
     setIsRecalculating(true);
     try {
-      const res = await (await fetch("http://localhost:8000/api/priority/recalculate", { method: "POST" })).json();
+      const res = await api.recalculatePriorities();
       setNotice(`Network priority scores recalculated for ${res.tasks_recalculated} tasks across departments.`);
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {

@@ -88,7 +88,7 @@ export const DashboardPage: React.FC = () => {
           <AlertCircle className="w-5 h-5 text-rose-600" />
           <span>Backend Connection Error</span>
         </div>
-        <p className="text-sm">{error || "Unable to reach FastAPI server at http://localhost:8000"}</p>
+        <p className="text-sm">{error || "Unable to reach FastAPI backend service."}</p>
         <button
           onClick={loadData}
           className="px-4 py-2 bg-rose-600 text-white rounded text-xs font-semibold hover:bg-rose-700 transition"

@@ -141,7 +141,54 @@ RailBlock Advisor adheres strictly to **Human-in-the-Loop (HITL)** railway safet
 
 ---
 
-## 5. Synthetic Demo Data & Disclaimer
+## 5. Environment Variables & Production Deployment
+
+### Environment Configuration
+
+Both backend and frontend support environment-driven configuration for seamless local development and production hosting:
+
+#### Backend Environment (`backend/.env`)
+Copy the template file to `.env`:
+```bash
+cp backend/.env.example backend/.env
+```
+Key variables:
+- `FRONTEND_ORIGIN`: Allowed origins for CORS (e.g., `https://railblock-advisor.vercel.app` or `http://localhost:5173`). Supports comma-separated origins.
+- `HOST`: Server host binding (default: `0.0.0.0`).
+- `PORT`: Server port (default: `8000`).
+- `CORS_ALLOW_ALL`: Set to `false` for production, `true` for unrestricted local testing.
+
+#### Frontend Environment (`frontend/.env`)
+Copy the template file to `.env`:
+```bash
+cp frontend/.env.example frontend/.env
+```
+Key variables:
+- `VITE_API_BASE_URL`: URL of the deployed FastAPI backend (e.g., `https://api-railblock.onrender.com`). If unset, defaults to `http://localhost:8000`.
+
+---
+
+### Production Deployment Instructions
+
+#### 1. Backend Deployment (Render, Railway, Fly.io, or AWS EC2)
+- **Runtime**: Python 3.9+
+- **Build Command**: `pip install -r requirements.txt && python seed_data.py`
+- **Start Command**: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- **Environment Variables**:
+  - `FRONTEND_ORIGIN`: Your deployed frontend domain (e.g., `https://railblock-advisor.vercel.app`).
+  - `CORS_ALLOW_ALL`: `false`
+
+#### 2. Frontend Deployment (Vercel, Netlify, or Cloudflare Pages)
+- **Framework Preset**: Vite
+- **Root Directory**: `frontend`
+- **Build Command**: `npm run build`
+- **Output Directory**: `dist`
+- **Environment Variables**:
+  - `VITE_API_BASE_URL`: Your deployed backend URL (e.g., `https://api-railblock.onrender.com`).
+
+---
+
+## 6. Synthetic Demo Data & Disclaimer
 
 - **Synthetic Corridor Alpha**: All data files located in `data/` (`maintenance_tasks.json`, `train_movements.json`, `block_windows.json`, `resources.json`) represent synthetic operational data for demonstration purposes only.
 - **Decision-Support Scope**: RailBlock Advisor provides AI-assisted, constraint-aware scheduling recommendations for operations planners. It does not replace human authorization or execute automated train dispatching.
