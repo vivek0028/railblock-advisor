@@ -337,20 +337,63 @@ def test_deployment_and_route_aliases():
     assert res_audit.status_code == 200
     assert isinstance(res_audit.json(), list)
 
-    # 8. CORS Verification for Vercel production frontend
-    cors_res = client.options(
+    # 8. CORS Verification: OPTIONS /api/dashboard/summary with Origin
+    opt_dash = client.options(
         "/api/dashboard/summary",
         headers={
             "Origin": "https://railblock-advisor-frontend.vercel.app",
             "Access-Control-Request-Method": "GET"
         }
     )
-    assert cors_res.status_code == 200
-    assert cors_res.headers.get("access-control-allow-origin") == "https://railblock-advisor-frontend.vercel.app"
+    assert opt_dash.status_code == 200
+    assert opt_dash.headers.get("access-control-allow-origin") == "https://railblock-advisor-frontend.vercel.app"
 
-    # 9. Resiliency check: /api/api/ normalization
+    # 9. CORS Verification: GET /api/dashboard/summary with Origin header
+    get_dash = client.get(
+        "/api/dashboard/summary",
+        headers={
+            "Origin": "https://railblock-advisor-frontend.vercel.app"
+        }
+    )
+    assert get_dash.status_code == 200
+    assert get_dash.headers.get("access-control-allow-origin") == "https://railblock-advisor-frontend.vercel.app"
+
+    # 10. CORS Verification: OPTIONS /api/optimization/plans with Origin header
+    opt_plans = client.options(
+        "/api/optimization/plans",
+        headers={
+            "Origin": "https://railblock-advisor-frontend.vercel.app",
+            "Access-Control-Request-Method": "GET"
+        }
+    )
+    assert opt_plans.status_code == 200
+    assert opt_plans.headers.get("access-control-allow-origin") == "https://railblock-advisor-frontend.vercel.app"
+
+    # 11. CORS Verification: Preview deployment safe regex and localhost:4173
+    opt_prev = client.options(
+        "/api/dashboard/summary",
+        headers={
+            "Origin": "https://railblock-advisor-frontend-git-main-vivek0028.vercel.app",
+            "Access-Control-Request-Method": "GET"
+        }
+    )
+    assert opt_prev.status_code == 200
+    assert opt_prev.headers.get("access-control-allow-origin") == "https://railblock-advisor-frontend-git-main-vivek0028.vercel.app"
+
+    opt_4173 = client.options(
+        "/api/dashboard/summary",
+        headers={
+            "Origin": "http://localhost:4173",
+            "Access-Control-Request-Method": "GET"
+        }
+    )
+    assert opt_4173.status_code == 200
+    assert opt_4173.headers.get("access-control-allow-origin") == "http://localhost:4173"
+
+    # 12. Resiliency check: /api/api/ normalization
     res_dup = client.get("/api/api/health")
     assert res_dup.status_code == 200
     assert res_dup.json()["status"] == "healthy"
+
 
 

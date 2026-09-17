@@ -52,15 +52,22 @@ def health_check():
         "mode": "DEMO DATA (Synthetic Indian Railways Corridor Alpha)"
     }
 
+# Normalize duplicate /api/api/ paths if forwarded by clients or proxies
+@app.middleware("http")
+async def normalize_duplicate_api_prefix(request, call_next):
+    path = request.scope.get("path", "")
+    if path.startswith("/api/api/"):
+        request.scope["path"] = path.replace("/api/api/", "/api/", 1)
+    return await call_next(request)
+
 # Configure CORS
 default_origins = [
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
     "https://railblock-advisor-frontend.vercel.app",
+    "http://localhost:5173",
+    "http://localhost:4173",
 ]
 
-# Support production frontend URL or comma-separated list via environment variable
+# Support production frontend URL or comma-separated list via environment variable without overriding default origins
 frontend_origin_env = os.getenv("FRONTEND_ORIGIN")
 if frontend_origin_env:
     for origin in frontend_origin_env.split(","):
@@ -71,22 +78,15 @@ if frontend_origin_env:
 allow_all = os.getenv("CORS_ALLOW_ALL", "false").lower() == "true"
 cors_origins = ["*"] if allow_all else default_origins
 
+# Add CORSMiddleware as outermost middleware to ensure CORS headers on all requests and preflights
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_origin_regex=r"^https://railblock-advisor.*\.vercel\.app$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origin_regex=r"^https://railblock-advisor-frontend(-[a-z0-9-]+)?\.vercel\.app$",
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Content-Type", "Authorization", "Accept"],
 )
-
-# Normalize duplicate /api/api/ paths if forwarded by clients or proxies
-@app.middleware("http")
-async def normalize_duplicate_api_prefix(request, call_next):
-    path = request.scope.get("path", "")
-    if path.startswith("/api/api/"):
-        request.scope["path"] = path.replace("/api/api/", "/api/", 1)
-    return await call_next(request)
 
 # Route Aliases for deployment verification & backward compatibility
 @app.get("/api/overview")
