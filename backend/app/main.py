@@ -1,0 +1,76 @@
+from contextlib import asynccontextmanager
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from app.database import Base, engine
+from app.routers import (
+    health_router,
+    tasks_router,
+    movements_router,
+    block_windows_router,
+    resources_router,
+    data_sources_router,
+    conflicts_router,
+    optimization_router,
+    simulation_router,
+    compatibility_router,
+    priority_router,
+    dashboard_router,
+    audit_router
+)
+from seed_data import seed_database
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: Ensure tables exist and seed demo data if empty
+    Base.metadata.create_all(bind=engine)
+    seed_database(force=False)
+    yield
+
+app = FastAPI(
+    title="RailBlock Advisor API",
+    description=(
+        "AI-Assisted Maintenance Block Planning for Indian Railways (SIH 2026 Problem Statement 26027).\n\n"
+        "**NOTE**: This decision-support system operates on **DEMO DATA** only. "
+        "It does NOT connect to live Indian Railways internal systems and does NOT autonomously control trains or approve blocks."
+    ),
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# Configure CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount Routers
+app.include_router(health_router)
+app.include_router(dashboard_router)
+app.include_router(tasks_router)
+app.include_router(movements_router)
+app.include_router(block_windows_router)
+app.include_router(resources_router)
+app.include_router(data_sources_router)
+app.include_router(conflicts_router)
+app.include_router(optimization_router)
+app.include_router(simulation_router)
+app.include_router(compatibility_router)
+app.include_router(priority_router)
+app.include_router(audit_router)
+
+@app.get("/")
+def root():
+    return {
+        "project": "RailBlock Advisor",
+        "subtitle": "AI-Assisted Maintenance Block Planning for Indian Railways",
+        "problem_statement": "SIH 2026 PS 26027",
+        "status": "Operational (Constraint Optimization Backend)",
+        "docs_url": "/docs",
+        "data_mode": "DEMO DATA",
+        "solver": "Google OR-Tools CP-SAT",
+        "disclaimer": "Decision-support prototype only. Not connected to live Indian Railways systems."
+    }
