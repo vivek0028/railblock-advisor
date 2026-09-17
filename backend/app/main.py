@@ -31,14 +31,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="RailBlock Advisor API",
     description=(
-        "AI-Assisted Maintenance Block Planning for Indian Railways (SIH 2026 Problem Statement 26027).\n\n"
-        "**NOTE**: This decision-support system operates on **DEMO DATA** only. "
-        "It does NOT connect to live Indian Railways internal systems and does NOT autonomously control trains or approve blocks."
+        "AI-Assisted Maintenance Block Planning for Indian Railways."
+        "**NOTE** This decision-support system operates on **DEMO DATA**."
+        "It does NOT connect to live Indian Railways internal systems."
     ),
     version="1.0.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
 # Configure CORS
 default_origins = [
     "http://localhost:5173",
