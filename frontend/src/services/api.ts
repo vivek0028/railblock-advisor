@@ -10,24 +10,23 @@ import {
   CompatibilityBundle
 } from "../types";
 
-const getApiBaseUrl = (): string => {
-  const envUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL;
-  if (typeof envUrl === "string" && envUrl.trim() !== "") {
-    return envUrl.trim().replace(/\/+$/, "");
-  }
-  // Local development fallback
-  if (import.meta.env.DEV) {
-    return "http://localhost:8000";
-  }
-  // Production deployment fallback
-  return "https://railblock-advisor.onrender.com";
-};
+// Safe development fallback: use VITE_API_BASE_URL or fallback to http://localhost:8000
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
-const API_BASE = getApiBaseUrl();
+// Ensure trailing slash is removed and strip trailing /api to prevent /api/api/ duplicated paths
+export const API_BASE_URL = rawBaseUrl.trim().replace(/\/+$/, "").replace(/\/api$/, "");
 
-async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
-  const cleanPath = url.startsWith("/") ? url : `/${url}`;
-  const response = await fetch(`${API_BASE}${cleanPath}`, {
+async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  // Ensure endpoint starts with a single slash
+  let path = endpoint.startsWith("/") ? endpoint : `/${endpoint}`;
+
+  // Prevent duplicate /api/api path segments if both base and endpoint have /api
+  if (path.startsWith("/api/api/")) {
+    path = path.replace(/^\/api\/api\//, "/api/");
+  }
+
+  const url = `${API_BASE_URL}${path}`;
+  const response = await fetch(url, {
     ...options,
     headers: {
       "Content-Type": "application/json",

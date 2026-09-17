@@ -348,3 +348,9 @@ def test_deployment_and_route_aliases():
     assert cors_res.status_code == 200
     assert cors_res.headers.get("access-control-allow-origin") == "https://railblock-advisor-frontend.vercel.app"
 
+    # 9. Resiliency check: /api/api/ normalization
+    res_dup = client.get("/api/api/health")
+    assert res_dup.status_code == 200
+    assert res_dup.json()["status"] == "healthy"
+
+

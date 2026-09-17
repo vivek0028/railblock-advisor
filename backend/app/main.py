@@ -80,6 +80,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Normalize duplicate /api/api/ paths if forwarded by clients or proxies
+@app.middleware("http")
+async def normalize_duplicate_api_prefix(request, call_next):
+    path = request.scope.get("path", "")
+    if path.startswith("/api/api/"):
+        request.scope["path"] = path.replace("/api/api/", "/api/", 1)
+    return await call_next(request)
+
 # Route Aliases for deployment verification & backward compatibility
 @app.get("/api/overview")
 def get_overview_alias(db: Session = Depends(get_db)):
