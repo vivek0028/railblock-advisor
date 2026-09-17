@@ -37,7 +37,7 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 
 export const api = {
   // Health
-  getHealth: () => fetchJson<{ status: string; mode: string }>("/api/health"),
+  getHealth: () => fetchJson<{ status: string; mode: string }>("/health"),
 
   // Dashboard
   getDashboardSummary: () => fetchJson<DashboardSummary>("/api/dashboard/summary"),
