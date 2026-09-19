@@ -3,26 +3,39 @@
 @tailwind utilities;
 
 @layer base {
-  body {
-    @apply bg-[#F8FAFC] text-slate-900 font-sans antialiased min-h-screen;
-    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  :root {
+    --railway-navy: #0B192C;
+    --railway-blue: #0056B3;
+    --railway-accent: #1E3E62;
   }
 
-  /* Professional Railway Tables */
+  body {
+    @apply bg-[#F4F6F9] text-slate-900 font-sans antialiased min-h-screen selection:bg-blue-100 selection:text-blue-900;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11", "tnum";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Professional Railway Enterprise Tables */
   table {
-    @apply w-full text-left text-sm border-collapse;
+    @apply w-full text-left text-xs border-collapse;
   }
   
   th {
-    @apply font-semibold text-slate-700 bg-slate-100 py-3 px-4 border-b border-slate-200;
+    @apply font-bold text-slate-600 bg-slate-100/90 py-3 px-3.5 border-b border-slate-200 uppercase tracking-wider text-[11px] whitespace-nowrap;
   }
   
   td {
-    @apply py-3 px-4 border-b border-slate-100 text-slate-800;
+    @apply py-3 px-3.5 border-b border-slate-100 text-slate-800;
+  }
+
+  /* Monospace tabular metrics */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
   }
 }
 
-/* Custom crisp scrollbars */
+/* Crisp, unobtrusive scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -32,8 +45,21 @@
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 3px;
+  border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Subtle GovTech card elevation */
+.card-elevation {
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.05), 0 1px 2px -1px rgb(0 0 0 / 0.05);
+}
+
+.card-elevation-hover {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-elevation-hover:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.07), 0 2px 4px -2px rgb(0 0 0 / 0.07);
+  transform: translateY(-1px);
 }

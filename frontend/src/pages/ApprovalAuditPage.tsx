@@ -106,7 +106,7 @@ export const ApprovalAuditPage: React.FC = () => {
       <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center space-x-3 text-xs text-amber-900 font-medium">
         <ShieldCheck className="w-5 h-5 text-amber-700 flex-shrink-0" />
         <span>
-          <strong>Operational Directive:</strong> RailBlock Advisor recommendations are non-autonomous decision support proposals.
+          <strong>Operational Directive:</strong> RailOptiBlock recommendations are non-autonomous decision support proposals.
           Final operational block sanction and power disconnection authorization strictly remain with authorized railway personnel.
         </span>
       </div>

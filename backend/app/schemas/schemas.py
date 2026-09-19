@@ -52,12 +52,30 @@ class MaintenanceTaskBase(BaseModel):
             raise ValueError(f"Invalid status '{v}'. Allowed values are: {', '.join(sorted(VALID_STATUS))}")
         return v
 
+    model_config = ConfigDict(extra="ignore")
+
     @field_validator("asset_type")
     @classmethod
     def validate_asset_type(cls, v: str) -> str:
-        if v not in VALID_ASSET_TYPES:
-            raise ValueError(f"Invalid asset type '{v}'. Allowed types are: {', '.join(sorted(VALID_ASSET_TYPES))}")
-        return v
+        clean = v.strip()
+        # Direct match
+        if clean in VALID_ASSET_TYPES:
+            return clean
+        # Common synonym normalization
+        lower = clean.lower()
+        if "track" in lower or "rail" in lower or "tamp" in lower or "ballast" in lower:
+            return "Track"
+        if "signal" in lower or "interlock" in lower:
+            return "Signal"
+        if "ohe" in lower or "catenary" in lower or "traction" in lower or "pantograph" in lower:
+            return "OHE"
+        if "point" in lower or "switch" in lower:
+            return "Point Machine"
+        if "bridge" in lower or "culvert" in lower:
+            return "Bridge"
+        if "telecom" in lower or "comms" in lower or "ofc" in lower:
+            return "Telecom"
+        raise ValueError(f"Invalid asset type '{v}'. Allowed types are: {', '.join(sorted(VALID_ASSET_TYPES))}")
 
     @field_validator("preferred_date")
     @classmethod

@@ -32,7 +32,7 @@ async def lifespan(app: FastAPI):
     yield
 
 app = FastAPI(
-    title="RailBlock Advisor API",
+    title="RailOptiBlock API",
     description=(
         "AI-Assisted Maintenance Block Planning for Indian Railways."
         "**NOTE** This decision-support system operates on **DEMO DATA**."
@@ -47,7 +47,7 @@ app = FastAPI(
 def health_check():
     return {
         "status": "healthy",
-        "service": "RailBlock Advisor Backend",
+        "service": "RailOptiBlock Backend",
         "version": "1.0.0",
         "mode": "DEMO DATA (Synthetic Indian Railways Corridor Alpha)"
     }
@@ -114,7 +114,7 @@ app.include_router(audit_alias_router)
 @app.get("/")
 def root():
     return {
-        "project": "RailBlock Advisor",
+        "project": "RailOptiBlock",
         "subtitle": "AI-Assisted Maintenance Block Planning for Indian Railways",
         "problem_statement": "SIH 2026 PS 26027",
         "status": "Operational (Constraint Optimization Backend)",

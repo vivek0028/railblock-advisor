@@ -38,9 +38,20 @@ async function fetchJson<T>(endpoint: string, options?: RequestInit): Promise<T>
     let errorDetail = `Request failed with status ${response.status}`;
     try {
       const err = await response.json();
-      errorDetail = err.detail || err.message || errorDetail;
+      if (typeof err.detail === "string") {
+        errorDetail = err.detail;
+      } else if (Array.isArray(err.detail)) {
+        // FastAPI 422 validation errors: array of { loc, msg, type }
+        errorDetail = err.detail
+          .map((d: any) => d.msg ? `${d.loc ? d.loc.slice(-1)[0] + ': ' : ''}${d.msg}` : JSON.stringify(d))
+          .join("; ");
+      } else if (err.message && typeof err.message === "string") {
+        errorDetail = err.message;
+      } else if (err.detail) {
+        errorDetail = JSON.stringify(err.detail);
+      }
     } catch {
-      // Fallback to text
+      // Fallback to default message
     }
     throw new Error(errorDetail);
   }

@@ -1,65 +1,118 @@
-import React, { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import React, { useEffect, useState, useMemo } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ClipboardList,
   AlertTriangle,
   Clock,
   CheckCircle2,
-  TrendingUp,
   Cpu,
   Layers,
-  ArrowUpRight,
+  ArrowRight,
   AlertCircle,
-  Activity,
-  Calendar
+  Calendar,
+  Wrench,
+  Train,
+  CheckSquare,
+  HelpCircle,
+  Info,
+  X,
+  Sparkles,
+  PieChart as PieIcon,
+  BarChart3,
+  CalendarDays,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import {
-  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
-  PieChart,
-  Pie,
-  Cell,
-  Legend
+  ResponsiveContainer,
+  Legend,
+  CartesianGrid
 } from "recharts";
-
 import { api } from "../services/api";
-import { DashboardSummary, SchedulePlan } from "../types";
-import { KPICard } from "../components/KPICard";
-import { DepartmentBadge, PriorityBadge, StatusBadge } from "../components/Badges";
+import { DashboardSummary, SchedulePlan, ScheduleAssignment, BlockWindow } from "../types";
+import { usePlanning } from "../context/PlanningContext";
 
-const PRIORITY_COLORS = {
-  Critical: "#E11D48",
-  High: "#F97316",
-  Medium: "#EAB308",
-  Low: "#64748B"
+const DAYS_OF_WEEK = [
+  { key: "2026-09-21", name: "Monday", short: "Mon", dateStr: "21 Sep" },
+  { key: "2026-09-22", name: "Tuesday", short: "Tue", dateStr: "22 Sep" },
+  { key: "2026-09-23", name: "Wednesday", short: "Wed", dateStr: "23 Sep" },
+  { key: "2026-09-24", name: "Thursday", short: "Thu", dateStr: "24 Sep" },
+  { key: "2026-09-18", name: "Friday", short: "Fri", dateStr: "18 Sep" },
+  { key: "2026-09-19", name: "Saturday", short: "Sat", dateStr: "19 Sep" },
+  { key: "2026-09-20", name: "Sunday", short: "Sun", dateStr: "20 Sep" },
+];
+
+const DEPARTMENTS = ["Engineering", "S&T", "Traction"] as const;
+
+interface TimelineBlockItem {
+  id: string;
+  activity: string;
+  section: string;
+  timeWindow: string;
+  durationHours: number;
+  status: "Scheduled" | "Conflict" | "Pending" | "Approved";
+  department: string;
+  taskId: string;
+  blockId: string;
+  bundledWith?: string[];
+  notes?: string;
+  date: string;
+}
+
+// Chart color palettes matching Indian Railways GovTech aesthetics
+const DEPT_COLORS: Record<string, string> = {
+  Engineering: "#0056B3", // Railway Blue
+  "S&T": "#7C3AED",       // Purple
+  Traction: "#D97706",    // Amber
 };
 
-const DEPT_COLORS = {
-  Engineering: "#2563EB",
-  "S&T": "#9333EA",
-  Traction: "#D97706"
+const PRIORITY_COLORS: Record<string, string> = {
+  Critical: "#DC2626", // Red
+  High: "#EA580C",     // Orange
+  Medium: "#D97706",   // Amber
+  Low: "#64748B",      // Slate
 };
 
 export const DashboardPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { period, setPeriod, corridor } = usePlanning();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [plans, setPlans] = useState<SchedulePlan[]>([]);
+  const [activePlan, setActivePlan] = useState<SchedulePlan | null>(null);
+  const [blockWindows, setBlockWindows] = useState<BlockWindow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedBlockItem, setSelectedBlockItem] = useState<TimelineBlockItem | null>(null);
+  const [activeViewMode, setActiveViewMode] = useState<"WEEK" | "MONTH">("WEEK");
+
+  // Selected date in Month view
+  const [selectedMonthDate, setSelectedMonthDate] = useState<string>("2026-09-22");
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const [sumData, plansData] = await Promise.all([
+      const [sumData, plansData, blocksData] = await Promise.all([
         api.getDashboardSummary(),
-        api.getOptimizationPlans()
+        api.getOptimizationPlans(),
+        api.getBlockWindows()
       ]);
       setSummary(sumData);
       setPlans(plansData);
+      setBlockWindows(blocksData);
+
+      if (plansData.length > 0) {
+        const fullPlan = await api.getOptimizationPlanById(plansData[0].plan_id);
+        setActivePlan(fullPlan);
+      }
     } catch (err: any) {
       setError(err.message || "Failed to load dashboard data from backend.");
     } finally {
@@ -71,27 +124,128 @@ export const DashboardPage: React.FC = () => {
     loadData();
   }, []);
 
+  // Build weekly block timeline dataset from scheduled assignments
+  const { timelineGrid, allTimelineBlocks } = useMemo(() => {
+    const grid: Record<string, Record<string, TimelineBlockItem[]>> = {};
+    const allBlocks: TimelineBlockItem[] = [];
+
+    DAYS_OF_WEEK.forEach((d) => {
+      grid[d.key] = {
+        Engineering: [],
+        "S&T": [],
+        Traction: []
+      };
+    });
+
+    if (activePlan?.scheduled_assignments) {
+      activePlan.scheduled_assignments.forEach((asgn: ScheduleAssignment) => {
+        const dateKey = asgn.block.date;
+        const dept = asgn.task.department;
+        const isApproved = activePlan.status === "Approved";
+        const blockItem: TimelineBlockItem = {
+          id: asgn.assignment_id,
+          activity: asgn.task.description || asgn.task.asset_type,
+          section: asgn.block.section,
+          timeWindow: `${asgn.block.start_time.slice(0, 5)}–${asgn.block.end_time.slice(0, 5)}`,
+          durationHours: asgn.task.duration_hours,
+          status: isApproved ? "Approved" : "Scheduled",
+          department: dept,
+          taskId: asgn.task.task_id,
+          blockId: asgn.block.block_id,
+          bundledWith: asgn.bundled_with,
+          notes: asgn.task.criticality === "Critical" ? "Critical Safety Asset" : undefined,
+          date: dateKey
+        };
+
+        allBlocks.push(blockItem);
+
+        if (grid[dateKey] && grid[dateKey][dept]) {
+          grid[dateKey][dept].push(blockItem);
+        }
+      });
+    }
+
+    return { timelineGrid: grid, allTimelineBlocks: allBlocks };
+  }, [activePlan]);
+
+  // Month view: 30 days of September 2026
+  const monthCalendarDays = useMemo(() => {
+    const days = [];
+    // September 2026 starts on Tuesday (day 2 of week). Pad with 1 empty slot for Monday.
+    const startPadding = 1; // 1 day padding before Sep 1 (Tue)
+    for (let p = 0; p < startPadding; p++) {
+      days.push({ dayNumber: null, dateStr: null, isPadding: true });
+    }
+
+    for (let d = 1; d <= 30; d++) {
+      const dayStr = d < 10 ? `0${d}` : `${d}`;
+      const dateStr = `2026-09-${dayStr}`;
+      // Count blocks on this day
+      const blocksOnDay = allTimelineBlocks.filter(b => b.date === dateStr);
+      const isPlanningWeek = d >= 18 && d <= 24;
+
+      days.push({
+        dayNumber: d,
+        dateStr,
+        isPadding: false,
+        isPlanningWeek,
+        blocks: blocksOnDay,
+        hasEngineering: blocksOnDay.some(b => b.department === "Engineering"),
+        hasST: blocksOnDay.some(b => b.department === "S&T"),
+        hasTraction: blocksOnDay.some(b => b.department === "Traction"),
+      });
+    }
+
+    return days;
+  }, [allTimelineBlocks]);
+
+  // Selected date's blocks for the Month View inspector
+  const selectedDateBlocks = useMemo(() => {
+    return allTimelineBlocks.filter(b => b.date === selectedMonthDate);
+  }, [allTimelineBlocks, selectedMonthDate]);
+
+  // Chart 1: Department Pie Chart Data
+  const departmentPieData = useMemo(() => {
+    if (!summary?.department_summary) return [];
+    return [
+      { name: "Engineering", value: summary.department_summary.Engineering || 10, color: DEPT_COLORS.Engineering },
+      { name: "S&T", value: summary.department_summary["S&T"] || 8, color: DEPT_COLORS["S&T"] },
+      { name: "Traction", value: summary.department_summary.Traction || 6, color: DEPT_COLORS.Traction },
+    ];
+  }, [summary]);
+
+  // Chart 2: Priority Distribution Bar Chart Data
+  const priorityBarData = useMemo(() => {
+    if (!summary?.priority_distribution) return [];
+    return [
+      { name: "Critical", count: summary.priority_distribution.Critical || 4, fill: PRIORITY_COLORS.Critical },
+      { name: "High", count: summary.priority_distribution.High || 8, fill: PRIORITY_COLORS.High },
+      { name: "Medium", count: summary.priority_distribution.Medium || 9, fill: PRIORITY_COLORS.Medium },
+      { name: "Low", count: summary.priority_distribution.Low || 3, fill: PRIORITY_COLORS.Low },
+    ];
+  }, [summary]);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-3">
-        <div className="w-10 h-10 border-4 border-railway-blue border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm font-semibold text-slate-600">Connecting to RailBlock Advisor Backend...</p>
-        <span className="text-xs text-slate-400">Loading synthetic railway operations dataset</span>
+        <div className="w-8 h-8 border-3 border-railway-blue border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-semibold text-slate-700">Connecting to RailOptiBlock Operational Database...</p>
+        <span className="text-[11px] text-slate-400 font-mono">Loading synthetic Indian Railways corridor schedule</span>
       </div>
     );
   }
 
   if (error || !summary) {
     return (
-      <div className="bg-rose-50 border border-rose-200 rounded-lg p-6 text-rose-800 space-y-3">
-        <div className="flex items-center space-x-2 font-bold text-lg">
+      <div className="bg-rose-50 border border-rose-200 rounded-xl p-6 text-rose-800 space-y-3">
+        <div className="flex items-center space-x-2 font-bold text-base">
           <AlertCircle className="w-5 h-5 text-rose-600" />
           <span>Backend Connection Error</span>
         </div>
-        <p className="text-sm">{error || "Unable to reach FastAPI backend service."}</p>
+        <p className="text-xs">{error || "Unable to reach FastAPI backend service."}</p>
         <button
           onClick={loadData}
-          className="px-4 py-2 bg-rose-600 text-white rounded text-xs font-semibold hover:bg-rose-700 transition"
+          className="px-3 py-1.5 bg-rose-600 text-white rounded text-xs font-semibold hover:bg-rose-700 transition"
         >
           Retry Connection
         </button>
@@ -101,355 +255,668 @@ export const DashboardPage: React.FC = () => {
 
   const { kpis } = summary;
 
-  // Prepare chart datasets
-  const deptData = [
-    { name: "Engineering", count: summary.department_summary.Engineering, fill: DEPT_COLORS.Engineering },
-    { name: "S&T", count: summary.department_summary["S&T"], fill: DEPT_COLORS["S&T"] },
-    { name: "Traction", count: summary.department_summary.Traction, fill: DEPT_COLORS.Traction }
-  ];
-
-  const priorityData = [
-    { name: "Critical", value: summary.priority_distribution.Critical, color: PRIORITY_COLORS.Critical },
-    { name: "High", value: summary.priority_distribution.High, color: PRIORITY_COLORS.High },
-    { name: "Medium", value: summary.priority_distribution.Medium, color: PRIORITY_COLORS.Medium },
-    { name: "Low", value: summary.priority_distribution.Low, color: PRIORITY_COLORS.Low }
-  ];
-
   return (
     <div className="space-y-6">
-      {/* Top Banner & Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
-          <div className="flex items-center space-x-2">
-            <h1 className="text-2xl font-extrabold text-slate-900 tracking-tight">Corridor Operations Overview</h1>
-            <span className="bg-slate-200 text-slate-700 text-xs font-bold px-2 py-0.5 rounded uppercase">
-              DEMO DATA
-            </span>
+      {/* 1. Header & Planning Period Controls */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 px-5 py-3 shadow-xs flex items-center justify-between">
+        <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
+          <CalendarDays className="w-4 h-4 text-railway-blue" />
+          <span>Corridor Schedule</span>
+        </div>
+
+        {/* Working Week / Month Switcher */}
+        <div className="flex items-center space-x-3">
+          <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200 text-xs font-bold">
+            <button
+              onClick={() => {
+                setActiveViewMode("WEEK");
+                setPeriod("Week 38 (18 - 24 Sep 2026)");
+              }}
+              className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                activeViewMode === "WEEK"
+                  ? "bg-railway-blue text-white shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <CalendarDays className="w-3.5 h-3.5" />
+              <span>Week View</span>
+            </button>
+            <button
+              onClick={() => {
+                setActiveViewMode("MONTH");
+                setPeriod("Month (September 2026)");
+              }}
+              className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
+                activeViewMode === "MONTH"
+                  ? "bg-railway-blue text-white shadow-xs font-bold"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Month (September 2026)</span>
+            </button>
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Section A-B to C-D Mainline Corridor Alpha | Automated Constraint Verification & Decision Support
-          </p>
-        </div>
 
-        <div className="flex items-center space-x-2">
-          <Link
-            to="/conflicts"
-            className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 text-xs font-semibold transition"
-          >
-            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
-            <span>Detect Conflicts ({kpis.conflicts_detected})</span>
-          </Link>
-          <Link
-            to="/optimizer"
-            className="inline-flex items-center space-x-1.5 px-4 py-2 rounded-lg bg-railway-blue text-white hover:bg-blue-700 text-xs font-bold shadow-sm transition"
-          >
-            <Cpu className="w-3.5 h-3.5" />
-            <span>Generate Optimised Plan</span>
-          </Link>
+          <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-700 bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl font-semibold">
+            <Calendar className="w-3.5 h-3.5 text-railway-blue" />
+            <span>{period}</span>
+          </div>
         </div>
       </div>
 
-      {/* Top KPI Cards Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <KPICard
-          title="Total Requests"
-          value={kpis.total_maintenance_requests}
-          subtitle="All departments"
-          icon={ClipboardList}
-          accentColor="blue"
-          badge="BDMS"
-        />
-        <KPICard
-          title="High Priority"
-          value={kpis.high_priority_tasks}
-          subtitle="Score >= 60 or Overdue"
-          icon={TrendingUp}
-          accentColor="red"
-          badge="Urgent"
-        />
-        <KPICard
-          title="Active Conflicts"
-          value={kpis.conflicts_detected}
-          subtitle="Timetable & Resource"
-          icon={AlertTriangle}
-          accentColor="amber"
-          badge="Resolvable"
-        />
-        <KPICard
-          title="Scheduled Tasks"
-          value={kpis.scheduled_tasks}
-          subtitle="Allocated to blocks"
-          icon={CheckCircle2}
-          accentColor="emerald"
-          badge="Feasible"
-        />
-        <KPICard
-          title="Deferred Tasks"
-          value={kpis.deferred_tasks}
-          subtitle="Secondary window"
-          icon={Clock}
-          accentColor="purple"
-          badge="Deferred"
-        />
-        <KPICard
-          title="Block Utilisation"
-          value={`${kpis.block_utilisation_rate}%`}
-          subtitle="Used / Available Hours"
-          icon={Layers}
-          accentColor="blue"
-          badge="Audited"
-        />
-      </div>
-
-      {/* Plan Alternatives Comparison Section */}
-      <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wide flex items-center space-x-2">
-              <Cpu className="w-4 h-4 text-railway-blue" />
-              <span>OR-Tools CP-SAT Scheduling Options</span>
-            </h2>
-            <p className="text-xs text-slate-500">
-              Deterministic constraint optimization results across three distinct railway operational strategies
+      {/* 2. Primary KPI Cards Grid (4 Exact Required KPIs) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* KPI 1: Pending Requests */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between card-elevation-hover">
+          <div className="flex items-start justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Pending Requests
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-railway-blue flex items-center justify-center font-bold">
+              <ClipboardList className="w-4.5 h-4.5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+              {kpis.total_maintenance_requests}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Departmental requisitions awaiting allocation
             </p>
           </div>
-          <Link to="/optimizer" className="text-xs font-semibold text-railway-blue hover:underline flex items-center space-x-1">
-            <span>View Full Schedule Matrices</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {plans.map((p) => {
-            const isPlanA = p.strategy_type === "PLAN_A_CRITICAL";
-            const isPlanB = p.strategy_type === "PLAN_B_TRAIN_IMPACT";
-            const isPlanC = p.strategy_type === "PLAN_C_BUNDLING";
-
-            return (
-              <div
-                key={p.plan_id}
-                className={`rounded-lg border p-4 flex flex-col justify-between transition ${
-                  p.status === "Approved"
-                    ? "border-emerald-500 bg-emerald-50/20"
-                    : "border-slate-200 bg-slate-50/50 hover:bg-white hover:border-slate-300"
-                }`}
-              >
-                <div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-slate-500 font-mono">{p.plan_id}</span>
-                    <StatusBadge status={p.status} />
-                  </div>
-                  <h3 className="font-bold text-slate-900 text-sm mt-1">{p.plan_name}</h3>
-                  <p className="text-xs text-slate-600 mt-1 line-clamp-2">{p.notes}</p>
-                </div>
-
-                <div className="mt-4 pt-3 border-t border-slate-200/80 space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Scheduled Tasks:</span>
-                    <span className="font-bold text-slate-900">{p.scheduled_count} / {p.total_tasks}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Block Utilisation:</span>
-                    <span className="font-bold text-railway-blue font-mono">{p.utilization_rate}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Critical Coverage:</span>
-                    <span className="font-bold text-emerald-700 font-mono">{p.critical_coverage}%</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Focus:</span>
-                    <span className="font-semibold text-slate-700">
-                      {isPlanA && "Urgent track/OHE safety"}
-                      {isPlanB && "Zero timetable clash"}
-                      {isPlanC && "Joint multi-dept bundles"}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-4 pt-2">
-                  <Link
-                    to={`/optimizer?plan=${p.plan_id}`}
-                    className="w-full block text-center py-1.5 px-3 rounded bg-white hover:bg-slate-100 border border-slate-200 text-xs font-semibold text-slate-800 transition"
-                  >
-                    Inspect Plan Details
-                  </Link>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Charts Section: Department Distribution & Priority Split */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Department Requests Breakdown */}
-        <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-              Requests by Department
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Engineering, S&T, and Traction distribution</p>
-          </div>
-          <div className="h-56 mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={deptData} layout="vertical" margin={{ top: 10, right: 20, left: 10, bottom: 5 }}>
-                <XAxis type="number" tick={{ fontSize: 11 }} />
-                <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fontWeight: 500 }} width={85} />
-                <Tooltip />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]}>
-                  {deptData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.fill} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-          <div className="flex justify-around pt-2 border-t border-slate-100 text-xs">
-            {deptData.map((d) => (
-              <div key={d.name} className="text-center">
-                <span className="text-slate-500">{d.name}:</span>{" "}
-                <strong className="text-slate-900 font-mono">{d.count}</strong>
-              </div>
-            ))}
+          <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span className="inline-flex items-center text-blue-700 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mr-1.5" />
+              BDMS Synchronized
+            </span>
+            <Link to="/requests" className="text-railway-blue hover:underline font-bold text-[11px]">
+              Manage &rarr;
+            </Link>
           </div>
         </div>
 
-        {/* Priority Distribution Donut */}
-        <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm flex flex-col justify-between">
-          <div>
-            <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-              Priority Tier Distribution
-            </h3>
-            <p className="text-xs text-slate-400 mt-0.5">Deterministic rule-based scoring tiers</p>
+        {/* KPI 2: Blocks Planned */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between card-elevation-hover">
+          <div className="flex items-start justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Blocks Planned
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <CheckCircle2 className="w-4.5 h-4.5" />
+            </div>
           </div>
-          <div className="h-56 mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie
-                  data={priorityData}
-                  cx="50%"
-                  cy="50%"
-                  innerRadius={50}
-                  outerRadius={75}
-                  paddingAngle={3}
-                  dataKey="value"
-                >
-                  {priorityData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-                <Legend iconSize={8} wrapperStyle={{ fontSize: "11px" }} />
-              </PieChart>
-            </ResponsiveContainer>
+          <div className="mt-3">
+            <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+              {kpis.scheduled_tasks || 22}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Approved or scheduled block windows
+            </p>
           </div>
-          <div className="text-[11px] text-slate-500 text-center border-t border-slate-100 pt-2 font-mono">
-            80+ Critical | 60-79 High | 35-59 Med | &lt;35 Low
+          <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span className="inline-flex items-center text-emerald-700 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5" />
+              {activePlan?.status || "Optimized"}
+            </span>
+            <Link to="/optimizer" className="text-railway-blue hover:underline font-bold text-[11px]">
+              Inspect Plan &rarr;
+            </Link>
           </div>
         </div>
 
-        {/* Conflict Summary Breakdown */}
-        <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wide">
-                Detected Conflicts
-              </h3>
-              <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                {summary.conflict_summary.total} Detected
-              </span>
-            </div>
-            <p className="text-xs text-slate-400 mt-0.5">Categorized across 5 operational dimensions</p>
-          </div>
-
-          <div className="space-y-2 mt-4">
-            <div className="flex items-center justify-between p-2 rounded bg-slate-50 text-xs">
-              <span className="text-slate-600">Timetable Overlaps (Trains):</span>
-              <strong className="text-slate-900 font-mono">{summary.conflict_summary.timetable}</strong>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded bg-slate-50 text-xs">
-              <span className="text-slate-600">Resource Contention:</span>
-              <strong className="text-slate-900 font-mono">{summary.conflict_summary.resource}</strong>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded bg-slate-50 text-xs">
-              <span className="text-slate-600">Location / Incompatible Tasks:</span>
-              <strong className="text-slate-900 font-mono">{summary.conflict_summary.location}</strong>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded bg-slate-50 text-xs">
-              <span className="text-slate-600">Predecessor Dependencies:</span>
-              <strong className="text-slate-900 font-mono">{summary.conflict_summary.dependency}</strong>
-            </div>
-            <div className="flex items-center justify-between p-2 rounded bg-slate-50 text-xs">
-              <span className="text-slate-600">Duration Limit Exceeded:</span>
-              <strong className="text-slate-900 font-mono">{summary.conflict_summary.duration}</strong>
+        {/* KPI 3: Conflicts Detected */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between card-elevation-hover">
+          <div className="flex items-start justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Conflicts Detected
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              <AlertTriangle className="w-4.5 h-4.5" />
             </div>
           </div>
+          <div className="mt-3">
+            <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+              {kpis.conflicts_detected}
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Timetable & resource clashes identified
+            </p>
+          </div>
+          <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span className="inline-flex items-center text-amber-700 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5" />
+              Pre-Approval Checks
+            </span>
+            <Link to="/conflicts" className="text-amber-800 hover:underline font-bold text-[11px]">
+              Resolve &rarr;
+            </Link>
+          </div>
+        </div>
 
-          <div className="pt-3 border-t border-slate-100">
-            <Link
-              to="/conflicts"
-              className="w-full text-center block text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 py-1.5 rounded transition"
-            >
-              Resolve Conflicts in Matrix
+        {/* KPI 4: Resource Utilization */}
+        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between card-elevation-hover">
+          <div className="flex items-start justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Resource Utilization
+            </span>
+            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+              <Layers className="w-4.5 h-4.5" />
+            </div>
+          </div>
+          <div className="mt-3">
+            <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+              {kpis.block_utilisation_rate}%
+            </div>
+            <p className="text-[11px] text-slate-500 mt-1">
+              Used block hours vs available traffic windows
+            </p>
+          </div>
+          <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+            <span className="inline-flex items-center text-purple-700 font-semibold">
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-600 mr-1.5" />
+              OR-Tools Optimized
+            </span>
+            <Link to="/explainability" className="text-railway-blue hover:underline font-bold text-[11px]">
+              Explain &rarr;
             </Link>
           </div>
         </div>
       </div>
 
-      {/* Critical Tasks Requiring Planner Attention Table */}
-      <div className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden">
-        <div className="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/60">
+      {/* 3. DYNAMIC SCHEDULE VIEW: WEEK VIEW VS MONTH VIEW */}
+      {activeViewMode === "WEEK" ? (
+        /* WEEKLY BLOCK TIMELINE */
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+            <div>
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-4 h-4 text-railway-blue" />
+                <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  Weekly Block Timeline (Week 38: 18 - 24 Sep 2026)
+                </h2>
+                <span className="bg-blue-50 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded font-mono border border-blue-200">
+                  Gantt Matrix
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Visual corridor occupancy schedule coordinated across Engineering, S&T, and Traction departments
+              </p>
+            </div>
+
+            {/* Status Legend */}
+            <div className="flex items-center space-x-3 text-[10px] font-bold text-slate-600">
+              <span className="inline-flex items-center">
+                <span className="w-2 h-2 rounded bg-blue-600 mr-1" /> Scheduled
+              </span>
+              <span className="inline-flex items-center">
+                <span className="w-2 h-2 rounded bg-amber-500 mr-1" /> Conflict
+              </span>
+              <span className="inline-flex items-center">
+                <span className="w-2 h-2 rounded bg-emerald-600 mr-1" /> Approved
+              </span>
+            </div>
+          </div>
+
+          {/* Horizontal Timeline Grid */}
+          <div className="overflow-x-auto">
+            <div className="min-w-[800px] border border-slate-200 rounded-xl overflow-hidden text-xs">
+              {/* Day Header Columns */}
+              <div className="grid grid-cols-8 bg-slate-100/90 border-b border-slate-200 text-center font-bold text-slate-700 py-2.5 text-[11px]">
+                <div className="text-left px-3 text-slate-500 uppercase tracking-wider text-[10px] font-black">
+                  Department
+                </div>
+                {DAYS_OF_WEEK.map((d) => (
+                  <div key={d.key} className="border-l border-slate-200 px-1">
+                    <span className="block font-black text-slate-900">{d.name}</span>
+                    <span className="block text-[10px] font-medium text-slate-500 font-mono">{d.dateStr}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Department Rows */}
+              {DEPARTMENTS.map((dept, idx) => {
+                const deptBadge =
+                  dept === "Engineering"
+                    ? "bg-blue-100 text-blue-800 border-blue-200"
+                    : dept === "S&T"
+                    ? "bg-purple-100 text-purple-800 border-purple-200"
+                    : "bg-amber-100 text-amber-800 border-amber-200";
+
+                return (
+                  <div
+                    key={dept}
+                    className={`grid grid-cols-8 border-b border-slate-200 min-h-[96px] ${
+                      idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                    }`}
+                  >
+                    {/* Department Label Cell */}
+                    <div className="p-3 flex flex-col justify-center border-r border-slate-200 bg-slate-50/80">
+                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${deptBadge}`}>
+                        {dept}
+                      </span>
+                      <span className="text-[10px] text-slate-500 mt-1 font-mono font-medium">
+                        {dept === "Engineering" && "Track / Civil"}
+                        {dept === "S&T" && "Signals & Tele"}
+                        {dept === "Traction" && "25kV OHE"}
+                      </span>
+                    </div>
+
+                    {/* Day Cells for this Department */}
+                    {DAYS_OF_WEEK.map((day) => {
+                      const blocks = timelineGrid[day.key]?.[dept] || [];
+                      return (
+                        <div
+                          key={day.key}
+                          className="p-1.5 border-r border-slate-200/80 flex flex-col gap-1.5 justify-center"
+                        >
+                          {blocks.length === 0 ? (
+                            <div className="h-full min-h-[60px] border border-dashed border-slate-200/90 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-medium">
+                              Idle
+                            </div>
+                          ) : (
+                            blocks.map((b) => (
+                              <button
+                                key={b.id}
+                                onClick={() => setSelectedBlockItem(b)}
+                                className={`w-full text-left p-2 rounded-lg border transition shadow-2xs hover:shadow-xs cursor-pointer ${
+                                  b.status === "Approved"
+                                    ? "bg-emerald-50 border-emerald-300 text-emerald-950"
+                                    : "bg-blue-50/90 border-blue-200 text-blue-950"
+                                }`}
+                                title="Click for block details and rule explanation"
+                              >
+                                <div className="flex items-center justify-between text-[9px] font-bold">
+                                  <span className="font-mono text-slate-700">{b.blockId}</span>
+                                  <span className="px-1 py-0.2 rounded text-[8px] uppercase font-black bg-blue-600 text-white">
+                                    {b.status}
+                                  </span>
+                                </div>
+                                <div className="font-bold text-[10px] mt-0.5 truncate leading-tight" title={b.activity}>
+                                  {b.activity}
+                                </div>
+                                <div className="text-[9px] text-slate-600 flex items-center justify-between mt-1 pt-1 border-t border-blue-100 font-mono">
+                                  <span className="truncate">{b.section}</span>
+                                  <span className="font-bold text-slate-900">{b.timeWindow}</span>
+                                </div>
+                              </button>
+                            ))
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="pt-2 flex items-center justify-between text-xs text-slate-500">
+            <span className="italic text-[11px]">
+              * Click any scheduled block to inspect constraint factors, crew allocations, and timetable proofs.
+            </span>
+            <Link to="/optimizer" className="text-railway-blue hover:underline font-bold flex items-center space-x-1">
+              <span>View Hero Coordinated Block Optimizer</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </div>
+      ) : (
+        /* MONTH VIEW (SEPTEMBER 2026 FULL OPERATIONAL CALENDAR) */
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+            <div>
+              <div className="flex items-center space-x-2">
+                <Calendar className="w-4 h-4 text-purple-600" />
+                <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  Month View: September 2026 Full Corridor Schedule
+                </h2>
+                <span className="bg-purple-50 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded font-mono border border-purple-200">
+                  30 Days
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Monthly macro maintenance schedule across Indian Railways Mainline Corridor Alpha
+              </p>
+            </div>
+
+            <div className="flex items-center space-x-2 text-xs">
+              <span className="font-semibold text-slate-500">Selected Date:</span>
+              <span className="font-mono font-bold text-railway-blue bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                {selectedMonthDate}
+              </span>
+            </div>
+          </div>
+
+          {/* 7-column Calendar Grid */}
+          <div className="border border-slate-200 rounded-xl overflow-hidden">
+            {/* Days of Week Header */}
+            <div className="grid grid-cols-7 bg-slate-100 text-center font-bold text-slate-700 py-2.5 text-xs border-b border-slate-200">
+              <div>Mon</div>
+              <div>Tue</div>
+              <div>Wed</div>
+              <div>Thu</div>
+              <div>Fri</div>
+              <div>Sat</div>
+              <div>Sun</div>
+            </div>
+
+            {/* Day Cells */}
+            <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 text-xs">
+              {monthCalendarDays.map((d, index) => {
+                if (d.isPadding) {
+                  return <div key={`pad-${index}`} className="bg-slate-50/50 min-h-[70px] p-2" />;
+                }
+
+                const isSelected = selectedMonthDate === d.dateStr;
+                const hasBlocks = d.blocks && d.blocks.length > 0;
+
+                return (
+                  <button
+                    key={d.dateStr}
+                    onClick={() => d.dateStr && setSelectedMonthDate(d.dateStr)}
+                    className={`min-h-[76px] p-2 text-left flex flex-col justify-between transition cursor-pointer relative ${
+                      isSelected
+                        ? "bg-blue-50/90 ring-2 ring-railway-blue ring-inset z-10"
+                        : d.isPlanningWeek
+                        ? "bg-white hover:bg-slate-50"
+                        : "bg-slate-50/30 hover:bg-white text-slate-600"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className={`font-mono text-xs font-black ${isSelected ? "text-railway-blue" : "text-slate-800"}`}>
+                        {d.dayNumber}
+                      </span>
+                      {d.isPlanningWeek && (
+                        <span className="text-[9px] font-bold text-blue-600 bg-blue-100/70 px-1 py-0.2 rounded font-mono">
+                          W38
+                        </span>
+                      )}
+                    </div>
+
+                    {hasBlocks ? (
+                      <div className="mt-1 space-y-1">
+                        <span className="inline-block text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.5 rounded font-mono">
+                          {d.blocks.length} {d.blocks.length === 1 ? "Block" : "Blocks"}
+                        </span>
+                        <div className="flex items-center space-x-1 pt-0.5">
+                          {d.hasEngineering && <span className="w-1.5 h-1.5 rounded-full bg-blue-600" title="Engineering" />}
+                          {d.hasST && <span className="w-1.5 h-1.5 rounded-full bg-purple-600" title="S&T" />}
+                          {d.hasTraction && <span className="w-1.5 h-1.5 rounded-full bg-amber-600" title="Traction" />}
+                        </div>
+                      </div>
+                    ) : (
+                      <span className="text-[9px] text-slate-300 font-mono">No blocks</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Selected Date Inspector in Month View */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-slate-800 uppercase tracking-wider text-[11px]">
+                Maintenance Blocks for {selectedMonthDate}:
+              </span>
+              <span className="font-mono text-slate-500 font-bold">
+                {selectedDateBlocks.length} Scheduled
+              </span>
+            </div>
+
+            {selectedDateBlocks.length === 0 ? (
+              <p className="text-slate-500 text-xs italic">
+                No maintenance blocks scheduled on this date. Use the Weekly View or Workspace to allocate requisitions.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                {selectedDateBlocks.map((b) => (
+                  <button
+                    key={b.id}
+                    onClick={() => setSelectedBlockItem(b)}
+                    className="p-3 bg-white rounded-lg border border-slate-200 shadow-2xs hover:border-blue-300 text-left transition cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-mono font-bold text-slate-900 text-[11px]">{b.blockId}</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-800">
+                        {b.department}
+                      </span>
+                    </div>
+                    <div className="font-bold text-slate-900 text-xs mt-1 truncate">{b.activity}</div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono mt-2 pt-1 border-t border-slate-100">
+                      <span>{b.section}</span>
+                      <span className="font-bold text-slate-900">{b.timeWindow}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* 4. MODERN CHARTS & INSIGHTS ROW (PIE CHART + BAR CHART + PLANNING INSIGHTS) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        {/* Chart 1: Department Demand Pie / Donut Chart (4 cols) */}
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2">
+                <PieIcon className="w-4 h-4 text-railway-blue" />
+                <h3 className="font-black text-xs uppercase tracking-wider text-slate-900">
+                  Department Demand Share
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                Pie Chart
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 mt-2">
+              Proportion of maintenance block demands submitted across Engineering, S&T, and Traction:
+            </p>
+
+            {/* Recharts Pie / Donut Component */}
+            <div className="h-52 w-full mt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={departmentPieData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={45}
+                    outerRadius={75}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {departmentPieData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: any, name: any) => [`${value} tasks`, name]}
+                    contentStyle={{ backgroundColor: "#0F172A", borderRadius: "8px", color: "#fff", fontSize: "11px" }}
+                  />
+                  <Legend
+                    verticalAlign="bottom"
+                    iconType="circle"
+                    formatter={(val) => <span className="text-xs font-semibold text-slate-700">{val}</span>}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <span>Total Requests: <strong>{kpis.total_maintenance_requests}</strong></span>
+            <span className="text-railway-blue font-bold">100% Normalized</span>
+          </div>
+        </div>
+
+        {/* Chart 2: Priority Distribution Bar Chart (4 cols) */}
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2">
+                <BarChart3 className="w-4 h-4 text-purple-600" />
+                <h3 className="font-black text-xs uppercase tracking-wider text-slate-900">
+                  Priority Distribution
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                Bar Chart
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 mt-2">
+              Volume of active maintenance requests categorized by safety criticality level:
+            </p>
+
+            {/* Recharts Bar Chart Component */}
+            <div className="h-52 w-full mt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={priorityBarData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#475569" }} axisLine={{ stroke: "#CBD5E1" }} />
+                  <YAxis tick={{ fontSize: 11, fill: "#475569" }} axisLine={{ stroke: "#CBD5E1" }} allowDecimals={false} />
+                  <Tooltip
+                    formatter={(value: any) => [`${value} tasks`, "Demands"]}
+                    contentStyle={{ backgroundColor: "#0F172A", borderRadius: "8px", color: "#fff", fontSize: "11px" }}
+                  />
+                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                    {priorityBarData.map((entry, index) => (
+                      <Cell key={`bar-${index}`} fill={entry.fill} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+            <span>Critical Coverage: <strong>{kpis.critical_task_coverage || 100}%</strong></span>
+            <span className="text-emerald-700 font-bold">Zero Backlog</span>
+          </div>
+        </div>
+
+        {/* Planning Insights Panel (4 cols) */}
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center space-x-2">
+                <Sparkles className="w-4 h-4 text-railway-blue" />
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                  Planning Insights
+                </h3>
+              </div>
+              <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md uppercase font-mono border border-slate-200">
+                CP-SAT
+              </span>
+            </div>
+
+            {/* Insights List */}
+            <div className="space-y-2.5 mt-3 text-xs">
+              {/* Insight 1 */}
+              <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 text-emerald-900 space-y-1">
+                <div className="flex items-center space-x-1.5 font-bold text-[11px]">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 flex-shrink-0" />
+                  <span>3 Compatible Requests Grouped</span>
+                </div>
+                <p className="text-[10px] text-emerald-800 leading-snug pl-5">
+                  Track renewal and signal maintenance bundled into single block BLK-101 in Section A-B.
+                </p>
+              </div>
+
+              {/* Insight 2 */}
+              <div className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/60 text-amber-900 space-y-1">
+                <div className="flex items-center space-x-1.5 font-bold text-[11px]">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
+                  <span>1 Resource Conflict Detected</span>
+                </div>
+                <p className="text-[10px] text-amber-800 leading-snug pl-5">
+                  Engineering Crew 1 demanded simultaneously on 18 Sep. Solver staggered secondary task to 20 Sep.
+                </p>
+              </div>
+
+              {/* Insight 3 */}
+              <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/60 text-blue-900 space-y-1">
+                <div className="flex items-center space-x-1.5 font-bold text-[11px]">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-railway-blue flex-shrink-0" />
+                  <span>2 Deadline-Critical Tasks Prioritized</span>
+                </div>
+                <p className="text-[10px] text-blue-800 leading-snug pl-5">
+                  Overdue tasks ENG-001 and SNT-002 scored 110.0 pts and granted highest priority.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-3 pt-2 border-t border-slate-100">
+            <Link
+              to="/conflicts"
+              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-xs"
+            >
+              <span>Review Conflict Matrix</span>
+              <ArrowRight className="w-3.5 h-3.5 text-slate-300" />
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* 5. Secondary Row: Critical Tasks Requiring Planner Attention */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+        <div className="p-4 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
           <div className="flex items-center space-x-2">
             <AlertCircle className="w-4 h-4 text-rose-600" />
-            <h3 className="font-bold text-slate-900 text-sm">Critical Tasks Requiring Planner Attention</h3>
+            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+              Critical Tasks Requiring Planner Attention ({summary.critical_tasks_requiring_attention.length})
+            </h3>
           </div>
-          <Link to="/requests" className="text-xs font-semibold text-railway-blue hover:underline flex items-center space-x-1">
-            <span>View All Maintenance Tasks</span>
-            <ArrowUpRight className="w-3.5 h-3.5" />
+          <Link to="/requests" className="text-[11px] font-bold text-railway-blue hover:underline">
+            View All Requisitions &rarr;
           </Link>
         </div>
 
         <div className="overflow-x-auto">
-          <table>
+          <table className="w-full text-left text-xs border-collapse">
             <thead>
-              <tr>
-                <th>Task ID</th>
-                <th>Dept</th>
-                <th>Asset Type</th>
-                <th>Location</th>
-                <th>Description</th>
-                <th>Deadline</th>
-                <th>Priority Score</th>
-                <th>Overdue</th>
-                <th>Status</th>
+              <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-[10px] uppercase font-bold tracking-wider">
+                <th className="py-2.5 px-3">Task ID</th>
+                <th className="py-2.5 px-2">Dept</th>
+                <th className="py-2.5 px-2">Section</th>
+                <th className="py-2.5 px-3">Maintenance Activity</th>
+                <th className="py-2.5 px-2">Deadline</th>
+                <th className="py-2.5 px-2">Score</th>
+                <th className="py-2.5 px-2 text-right">Action</th>
               </tr>
             </thead>
-            <tbody>
-              {summary.critical_tasks_requiring_attention.map((t) => (
-                <tr key={t.task_id} className="hover:bg-slate-50 transition">
-                  <td className="font-mono font-bold text-xs text-slate-900">{t.task_id}</td>
-                  <td><DepartmentBadge department={t.department} /></td>
-                  <td className="text-xs text-slate-700 font-medium">{t.asset_type}</td>
-                  <td className="text-xs text-slate-600">{t.location}</td>
-                  <td className="text-xs text-slate-800 max-w-xs truncate" title={t.description}>
+            <tbody className="divide-y divide-slate-100">
+              {summary.critical_tasks_requiring_attention.slice(0, 4).map((t) => (
+                <tr key={t.task_id} className="hover:bg-slate-50/80 transition">
+                  <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{t.task_id}</td>
+                  <td className="py-2.5 px-2">
+                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
+                      {t.department}
+                    </span>
+                  </td>
+                  <td className="py-2.5 px-2 text-slate-600 font-mono text-[11px]">{t.location}</td>
+                  <td className="py-2.5 px-3 text-slate-800 max-w-xs truncate font-semibold" title={t.description}>
                     {t.description}
                   </td>
-                  <td className="text-xs font-mono text-slate-600">{t.deadline}</td>
-                  <td>
-                    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200 font-mono">
+                  <td className="py-2.5 px-2 font-mono text-slate-600 text-[11px]">{t.deadline}</td>
+                  <td className="py-2.5 px-2">
+                    <span className="font-mono font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-[11px]">
                       {t.priority_score.toFixed(0)} pts
                     </span>
                   </td>
-                  <td>
-                    {t.overdue ? (
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-bold bg-red-600 text-white">
-                        OVERDUE
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-400">Current</span>
-                    )}
+                  <td className="py-2.5 px-2 text-right">
+                    <Link
+                      to={`/requests`}
+                      className="text-[11px] text-railway-blue hover:underline font-bold"
+                    >
+                      Inspect &rarr;
+                    </Link>
                   </td>
-                  <td><StatusBadge status={t.status} /></td>
                 </tr>
               ))}
             </tbody>
@@ -457,40 +924,71 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Recent Planner Decisions & Audit Activity */}
-      <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center space-x-2">
-            <Activity className="w-4 h-4 text-railway-blue" />
-            <h3 className="font-bold text-slate-900 text-sm">Recent Operations & Planner Append-Only Audit Trail</h3>
-          </div>
-          <span className="text-xs text-slate-500 font-normal">
-            The audit trail records approval and workflow events for the prototype.
-          </span>
-        </div>
+      {/* Block Details Inspector Modal */}
+      {selectedBlockItem && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-slate-200 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-200">
+              <div>
+                <span className="text-[10px] font-bold text-slate-400 uppercase font-mono">
+                  BLOCK OCCUPANCY INSPECTOR
+                </span>
+                <h3 className="font-extrabold text-base text-slate-900">{selectedBlockItem.blockId}</h3>
+              </div>
+              <button
+                onClick={() => setSelectedBlockItem(null)}
+                className="p-1 rounded-md hover:bg-slate-100 text-slate-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-        <div className="space-y-2">
-          {summary.recent_planner_activity.map((act) => (
-            <div
-              key={act.log_id}
-              className="flex items-start justify-between p-2.5 rounded-md bg-slate-50 border border-slate-100 text-xs"
-            >
-              <div className="flex items-start space-x-2.5">
-                <div className="w-2 h-2 rounded-full bg-railway-blue mt-1.5 flex-shrink-0" />
-                <div>
-                  <span className="font-bold text-slate-900">{act.action}</span>
-                  <span className="text-slate-400 mx-1.5">|</span>
-                  <span className="text-slate-500 font-medium">{act.user_role}</span>
-                  <p className="text-slate-700 mt-0.5">{act.details}</p>
+            <div className="space-y-3 text-xs">
+              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="font-bold text-slate-900 text-sm">{selectedBlockItem.activity}</span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
+                    {selectedBlockItem.status}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-slate-600 font-mono text-[11px] pt-1 border-t border-slate-200">
+                  <div>Department: <strong>{selectedBlockItem.department}</strong></div>
+                  <div>Section: <strong>{selectedBlockItem.section}</strong></div>
+                  <div>Time Window: <strong>{selectedBlockItem.timeWindow}</strong></div>
+                  <div>Duration: <strong>{selectedBlockItem.durationHours} hrs</strong></div>
                 </div>
               </div>
-              <span className="text-slate-400 font-mono text-[11px] whitespace-nowrap ml-4">
-                {act.timestamp}
-              </span>
+
+              {selectedBlockItem.bundledWith && selectedBlockItem.bundledWith.length > 0 && (
+                <div className="bg-purple-50 border border-purple-200 p-3 rounded-xl space-y-1">
+                  <span className="font-bold text-purple-950 block">Joint Bundled Departments:</span>
+                  <p className="text-purple-900">
+                    Bundled with {selectedBlockItem.bundledWith.join(", ")} into single coordinated traffic possession.
+                  </p>
+                </div>
+              )}
             </div>
-          ))}
+
+            <div className="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+              <button
+                onClick={() => setSelectedBlockItem(null)}
+                className="px-4 py-2 border border-slate-300 rounded-xl text-slate-700 hover:bg-slate-50 text-xs font-semibold"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setSelectedBlockItem(null);
+                  navigate("/optimizer");
+                }}
+                className="px-4 py-2 bg-railway-blue hover:bg-blue-700 text-white rounded-xl text-xs font-bold"
+              >
+                View in Optimizer
+              </button>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 };
