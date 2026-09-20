@@ -24,14 +24,34 @@ import { usePlanning } from "../context/PlanningContext";
 
 export const ApprovalPage: React.FC = () => {
   const navigate = useNavigate();
-  const { role } = usePlanning();
+  const { role, departmentRole, activeRoleDetail } = usePlanning();
   const [plans, setPlans] = useState<SchedulePlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("PLAN-A-CRIT");
   const [plannerComments, setPlannerComments] = useState("All hard safety constraints verified against Section A-B timetable. Coordinated multi-departmental block approved for execution.");
-  const [authorizerName, setAuthorizerName] = useState("Sr. DOM Rajesh Sharma");
+  const [authorizerName, setAuthorizerName] = useState("Sr. DOM Rajesh Sharma (Division Operations)");
   const [loading, setLoading] = useState(true);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Sync authorizer with active perspective role
+  useEffect(() => {
+    switch (departmentRole) {
+      case "OPERATING":
+        setAuthorizerName("CTNL Rajesh Sharma (Operating / Chief Train Controller)");
+        break;
+      case "ENGINEERING":
+        setAuthorizerName("Sr. DEN S. Mukherjee (Civil Engineering Track Co-Ord)");
+        break;
+      case "ST":
+        setAuthorizerName("Sr. DSTE V. Narayanan (Signal & Telecom)");
+        break;
+      case "TRACTION":
+        setAuthorizerName("Sr. DEE A. Verma (Traction Distribution TRD)");
+        break;
+      default:
+        setAuthorizerName("Sr. DOM Rajesh Sharma (Division Operations)");
+    }
+  }, [departmentRole]);
 
   // Modals state
   const [showRejectModal, setShowRejectModal] = useState(false);

@@ -122,7 +122,7 @@ const CustomBarTooltip = ({ active, payload, label }: any) => {
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
-  const { period, setPeriod, corridor } = usePlanning();
+  const { period, setPeriod, corridor, departmentRole, activeRoleDetail, setDepartmentRole } = usePlanning();
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
   const [plans, setPlans] = useState<SchedulePlan[]>([]);
   const [activePlan, setActivePlan] = useState<SchedulePlan | null>(null);
@@ -297,7 +297,30 @@ export const DashboardPage: React.FC = () => {
   const { kpis } = summary;
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
+      {/* Active Role Perspective Banner */}
+      {departmentRole !== "UNIFIED" && (
+        <div className="bg-[#0B192C] text-white rounded-xl px-3 py-1.5 flex flex-wrap items-center justify-between text-xs border border-blue-900/60 shadow-xs gap-2">
+          <div className="flex items-center space-x-2">
+            <span className={`w-2 h-2 rounded-full ${
+              departmentRole === "ENGINEERING" ? "bg-sky-400" :
+              departmentRole === "ST" ? "bg-purple-400" :
+              departmentRole === "TRACTION" ? "bg-amber-400" : "bg-rose-400"
+            } animate-pulse`} />
+            <span className="font-bold text-white text-xs">
+              Active Perspective: {activeRoleDetail.title} ({activeRoleDetail.designation})
+            </span>
+            <span className="text-slate-300 hidden md:inline text-[11px] font-medium">&bull; {activeRoleDetail.focusMetrics}</span>
+          </div>
+          <button
+            onClick={() => setDepartmentRole("UNIFIED")}
+            className="text-[11px] font-semibold text-blue-300 hover:text-white underline cursor-pointer"
+          >
+            Switch to Unified View &rarr;
+          </button>
+        </div>
+      )}
+
       {/* 1. Primary KPI Cards Grid (4 Essential Railway Metrics) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         {/* KPI 1: Pending Requests */}

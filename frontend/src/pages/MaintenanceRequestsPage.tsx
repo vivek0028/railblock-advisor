@@ -26,18 +26,19 @@ import {
 import { api } from "../services/api";
 import { MaintenanceTask } from "../types";
 import { DepartmentBadge, PriorityBadge, StatusBadge } from "../components/Badges";
+import { usePlanning } from "../context/PlanningContext";
 
 export const MaintenanceRequestsPage: React.FC = () => {
   const navigate = useNavigate();
+  const { departmentRole, activeRoleDetail } = usePlanning();
   const [tasks, setTasks] = useState<MaintenanceTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-
   // Filters
   const [search, setSearch] = useState("");
-  const [deptFilter, setDeptFilter] = useState("ALL");
+  const [deptFilter, setDeptFilter] = useState<string>(activeRoleDetail.department || "ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [sectionFilter, setSectionFilter] = useState("ALL");
@@ -88,6 +89,15 @@ export const MaintenanceRequestsPage: React.FC = () => {
     loadTasks();
   }, []);
 
+  // Synchronize filter when Department Role changes
+  useEffect(() => {
+    if (activeRoleDetail.department) {
+      setDeptFilter(activeRoleDetail.department);
+    } else {
+      setDeptFilter("ALL");
+    }
+  }, [departmentRole]);
+
   const handleRecalculatePriorities = async () => {
     setRecalculating(true);
     try {
@@ -105,9 +115,10 @@ export const MaintenanceRequestsPage: React.FC = () => {
   const handleOpenAddModal = () => {
     setEditingTask(null);
     const generatedId = `REQ-00${tasks.length + 1}`;
+    const initialDept = (activeRoleDetail.department as any) || "Engineering";
     setFormData({
       task_id: generatedId,
-      department: "Engineering",
+      department: initialDept,
       asset_type: "Track Inspection",
       location: "Section A-B",
       description: "Ultrasonic rail flaw detection and joint bolt tightening",
@@ -421,9 +432,35 @@ export const MaintenanceRequestsPage: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100 gap-1">
-          <span>
-            Total: <strong>{filteredTasks.length}</strong> demands &bull; <strong className="text-slate-800">Unified Continuous Table</strong> (10+ rows visible)
-          </span>
+          <div className="flex items-center space-x-2">
+            <span>
+              Total: <strong>{filteredTasks.length}</strong> demands &bull; <strong className="text-slate-800">Unified Table</strong> (10+ rows visible)
+            </span>
+            {activeRoleDetail.department && (
+              <span className="inline-flex items-center space-x-1 px-1.5 py-0.2 rounded border bg-blue-50 text-blue-800 border-blue-200 font-bold text-[10px]">
+                <span>{activeRoleDetail.shortTitle} Focus</span>
+                {deptFilter !== "ALL" ? (
+                  <button
+                    type="button"
+                    onClick={() => setDeptFilter("ALL")}
+                    className="ml-1 text-blue-600 hover:text-blue-900 underline cursor-pointer text-[10px]"
+                    title="Clear filter to view all departments"
+                  >
+                    Show All
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setDeptFilter(activeRoleDetail.department!)}
+                    className="ml-1 text-blue-600 hover:text-blue-900 underline cursor-pointer text-[10px]"
+                    title="Filter to department"
+                  >
+                    Filter
+                  </button>
+                )}
+              </span>
+            )}
+          </div>
           <div className="flex items-center space-x-3 font-medium">
             <span className="inline-flex items-center space-x-1">
               <span className="w-2 h-2 rounded-full bg-blue-600"></span>

@@ -16,7 +16,7 @@ import {
   X,
   Train
 } from "lucide-react";
-import { usePlanning } from "../context/PlanningContext";
+import { usePlanning, DepartmentRole, ROLE_CONFIGS } from "../context/PlanningContext";
 
 interface NavItem {
   name: string;
@@ -44,7 +44,7 @@ const SECONDARY_NAV_ITEMS: NavItem[] = [
 ];
 
 export const Sidebar: React.FC = () => {
-  const { role, setRole, sidebarOpen, setSidebarOpen } = usePlanning();
+  const { role, setRole, departmentRole, setDepartmentRole, sidebarOpen, setSidebarOpen } = usePlanning();
 
   // Close drawer on Escape key
   useEffect(() => {
@@ -186,21 +186,22 @@ export const Sidebar: React.FC = () => {
             </div>
           </div>
 
-          {/* Active Role Selector */}
+          {/* Active Role Perspective Selector */}
           <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-2xs">
             <div className="flex items-center space-x-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">
               <UserCheck className="w-3 h-3 text-railway-blue" />
-              <span>Active Planner Role</span>
+              <span>Operational Perspective</span>
             </div>
             <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
+              value={departmentRole}
+              onChange={(e) => setDepartmentRole(e.target.value as any)}
               className="w-full text-xs font-bold text-slate-900 bg-transparent focus:outline-none cursor-pointer border-none p-0"
             >
-              <option value="Railway Planner (Division)">Railway Planner (Division)</option>
-              <option value="Senior DOM (Sr. Divisional Operations Mgr)">Senior DOM (Sr. Divisional Operations Mgr)</option>
-              <option value="Chief Section Controller">Chief Section Controller</option>
-              <option value="HQ Block Reviewer">HQ Block Reviewer</option>
+              {(Object.keys(ROLE_CONFIGS) as DepartmentRole[]).map((key) => (
+                <option key={key} value={key}>
+                  {ROLE_CONFIGS[key].title} ({ROLE_CONFIGS[key].designation})
+                </option>
+              ))}
             </select>
           </div>
 
