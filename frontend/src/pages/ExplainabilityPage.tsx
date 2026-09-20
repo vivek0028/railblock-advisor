@@ -330,7 +330,7 @@ export const ExplainabilityPage: React.FC = () => {
     return (
       <div className="flex flex-col items-center justify-center min-h-[400px] space-y-3">
         <div className="w-8 h-8 border-3 border-railway-blue border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-semibold text-slate-700">Loading Request-Level Decision Reasoning Engine...</p>
+        <p className="text-xs font-semibold text-slate-700">Loading Request-Level Decision Explainability...</p>
         <span className="text-[11px] text-slate-400 font-mono">Fetching OR-Tools CP-SAT constraint validation bounds</span>
       </div>
     );
@@ -343,7 +343,7 @@ export const ExplainabilityPage: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2">
             <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-              Explainability & Reasoning Engine
+              Explainability
             </h1>
             <span className="bg-blue-100 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
               Decision Audit
