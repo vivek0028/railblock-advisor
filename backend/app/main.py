@@ -20,7 +20,8 @@ from app.routers import (
     priority_router,
     dashboard_router,
     audit_router,
-    audit_alias_router
+    audit_alias_router,
+    goods_forecast_router
 )
 from seed_data import seed_database
 
@@ -110,6 +111,7 @@ app.include_router(compatibility_router)
 app.include_router(priority_router)
 app.include_router(audit_router)
 app.include_router(audit_alias_router)
+app.include_router(goods_forecast_router)
 
 @app.get("/")
 def root():

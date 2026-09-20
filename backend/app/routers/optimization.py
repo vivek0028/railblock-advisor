@@ -14,6 +14,7 @@ router = APIRouter(tags=["Optimization Engine"])
 
 class PlanGenerateRequest(BaseModel):
     strategy_type: str = Field(default="ALL", description="ALL, PLAN_A_CRITICAL, PLAN_B_TRAIN_IMPACT, or PLAN_C_BUNDLING")
+    horizon: str = Field(default="WEEKLY", description="WEEKLY (7-day tactical) or MONTHLY (30-day strategic)")
     block_duration_bonus_hours: float = Field(default=0.0, description="Corridor block duration adjustment (hours)")
     additional_crew_count: int = Field(default=0, ge=0, le=2, description="Additional maintenance crews")
     allow_bundling: bool = Field(default=True, description="Enable cross-department joint maintenance bundling")
@@ -72,6 +73,7 @@ def generate_optimization_plans(
     for p_id, p_title, strat, p_desc in plans_to_run:
         plan_res = optimizer.solve_plan(
             strategy_type=strat,
+            horizon=req_data.horizon,
             block_duration_bonus_hours=req_data.block_duration_bonus_hours,
             additional_crew_count=req_data.additional_crew_count,
             allow_bundling=req_data.allow_bundling
@@ -82,6 +84,7 @@ def generate_optimization_plans(
             plan_id=p_id,
             plan_name=p_title,
             strategy_type=strat,
+            horizon=req_data.horizon,
             total_tasks=kpis["total_tasks"],
             scheduled_count=kpis["scheduled_count"],
             deferred_count=kpis["deferred_count"],
@@ -89,6 +92,8 @@ def generate_optimization_plans(
             utilization_rate=kpis["utilization_rate"],
             critical_coverage=kpis["critical_coverage"],
             objective_score=float(plan_res.get("objective_value", 0.0)),
+            asset_availability_pct=float(plan_res.get("asset_availability_pct", 96.5)),
+            goods_train_regulations=plan_res.get("goods_train_regulations", []),
             status="Generated",
             created_at=datetime.utcnow(),
             notes=p_desc,
@@ -116,10 +121,13 @@ def generate_optimization_plans(
             "plan_id": p_id,
             "plan_name": p_title,
             "strategy_type": strat,
+            "horizon": req_data.horizon,
             "description": p_desc,
             "status": "Generated",
             "kpis": kpis,
             "objective_value": plan_res.get("objective_value", 0.0),
+            "asset_availability_pct": float(plan_res.get("asset_availability_pct", 96.5)),
+            "goods_train_regulations": plan_res.get("goods_train_regulations", []),
             "scheduled_assignments": plan_res["scheduled_assignments"],
             "deferred_tasks": plan_res["deferred_tasks"]
         })
@@ -160,6 +168,7 @@ def list_optimization_plans(db: Session = Depends(get_db)):
             "plan_id": p.plan_id,
             "plan_name": p.plan_name,
             "strategy_type": p.strategy_type,
+            "horizon": getattr(p, "horizon", "WEEKLY") or "WEEKLY",
             "total_tasks": p.total_tasks,
             "scheduled_count": p.scheduled_count,
             "deferred_count": p.deferred_count,
@@ -167,6 +176,7 @@ def list_optimization_plans(db: Session = Depends(get_db)):
             "utilization_rate": p.utilization_rate,
             "critical_coverage": p.critical_coverage,
             "objective_score": p.objective_score,
+            "asset_availability_pct": getattr(p, "asset_availability_pct", 96.5) or 96.5,
             "status": p.status,
             "created_at": p.created_at.isoformat() if p.created_at else None,
             "approved_by": p.approved_by,
@@ -271,6 +281,9 @@ def get_optimization_plan_detail(plan_id: str, db: Session = Depends(get_db)):
         "plan_id": plan.plan_id,
         "plan_name": plan.plan_name,
         "strategy_type": plan.strategy_type,
+        "horizon": getattr(plan, "horizon", "WEEKLY") or "WEEKLY",
+        "asset_availability_pct": getattr(plan, "asset_availability_pct", 96.5) or 96.5,
+        "goods_train_regulations": getattr(plan, "goods_train_regulations", []) or [],
         "status": plan.status,
         "notes": plan.notes,
         "kpis": {
@@ -280,7 +293,8 @@ def get_optimization_plan_detail(plan_id: str, db: Session = Depends(get_db)):
             "conflict_count": plan.conflict_count,
             "utilization_rate": plan.utilization_rate,
             "critical_coverage": plan.critical_coverage,
-            "objective_score": plan.objective_score
+            "objective_score": plan.objective_score,
+            "asset_availability_pct": getattr(plan, "asset_availability_pct", 96.5) or 96.5
         },
         "created_at": plan.created_at.isoformat() if plan.created_at else None,
         "approved_by": plan.approved_by,

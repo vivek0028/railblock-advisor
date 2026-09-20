@@ -22,6 +22,7 @@ class MaintenanceTaskBase(BaseModel):
     dependencies: List[str] = Field(default_factory=list, description="List of precursor task IDs")
     compatible_departments: List[str] = Field(default_factory=list, description="Departments suitable for co-planning")
     status: str = Field(default="Pending", description="Pending, Scheduled, Deferred, In_Progress, Completed")
+    defect_code: Optional[str] = Field(default=None, description="Authentic Indian Railways defect identifier (e.g. USFD-IMR, POINT-STROKE-FAIL, OHE-STAGGER-SAG)")
 
     @field_validator("task_id")
     @classmethod

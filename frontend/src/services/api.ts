@@ -7,7 +7,8 @@ import {
   SchedulePlan,
   DashboardSummary,
   DataSourceItem,
-  CompatibilityBundle
+  CompatibilityBundle,
+  GoodsForecastItem
 } from "../types";
 
 // Safe development fallback: use VITE_API_BASE_URL or fallback to http://localhost:8000
@@ -138,6 +139,7 @@ export const api = {
 
   generateOptimizationPlans: (params?: {
     strategy_type?: string;
+    horizon?: "WEEKLY" | "MONTHLY";
     block_duration_bonus_hours?: number;
     additional_crew_count?: number;
     allow_bundling?: boolean;
@@ -149,8 +151,15 @@ export const api = {
       plans: SchedulePlan[];
     }>("/api/optimization/generate", {
       method: "POST",
-      body: JSON.stringify(params || { strategy_type: "ALL" })
+      body: JSON.stringify(params || { strategy_type: "ALL", horizon: "WEEKLY" })
     }),
+
+  // Goods Trains Forecast (FOIS)
+  getGoodsForecast: () =>
+    fetchJson<{
+      metadata: any;
+      records: GoodsForecastItem[];
+    }>("/api/goods-forecast"),
 
   approvePlan: (planId: string, data: { user_name: string; user_role: string; comments?: string }) =>
     fetchJson<{ status: string; new_status: string; approved_by: string }>(`/api/plans/${planId}/approve`, {

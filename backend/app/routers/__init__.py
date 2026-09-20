@@ -11,6 +11,7 @@ from app.routers.compatibility import router as compatibility_router
 from app.routers.priority import router as priority_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.audit import router as audit_router, audit_alias_router
+from app.routers.goods_forecast import router as goods_forecast_router
 
 __all__ = [
     "health_router",
@@ -27,6 +28,7 @@ __all__ = [
     "priority_router",
     "dashboard_router",
     "audit_router",
-    "audit_alias_router"
+    "audit_alias_router",
+    "goods_forecast_router"
 ]
 

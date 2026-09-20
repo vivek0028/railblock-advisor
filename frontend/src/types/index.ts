@@ -27,6 +27,7 @@ export interface MaintenanceTask {
   };
   assigned_block_id?: string | null;
   data_source?: string;
+  defect_code?: string;
   data_label?: string;
 }
 
@@ -87,6 +88,7 @@ export interface PlanKPIs {
   bundled_blocks_count: number;
   active_blocks_count: number;
   total_available_blocks: number;
+  asset_availability_pct?: number;
 }
 
 export interface ScheduleAssignment {
@@ -113,10 +115,37 @@ export interface DeferredTaskItem {
   };
 }
 
+export interface GoodsRegulationItem {
+  forecast_id: string;
+  rake_id: string;
+  section: string;
+  traffic_type: string;
+  loop_station: string;
+  regulation_strategy: string;
+  status: string;
+}
+
+export interface GoodsForecastItem {
+  forecast_id: string;
+  rake_id?: string;
+  section: string;
+  traffic_type: string;
+  expected_density?: string;
+  direction?: string;
+  priority_window_gap?: string;
+  loop_regulation_station?: string;
+  regulation_strategy?: string;
+  remarks?: string;
+  data_label?: string;
+}
+
 export interface SchedulePlan {
   plan_id: string;
   plan_name: string;
   strategy_type: string;
+  horizon?: "WEEKLY" | "MONTHLY";
+  asset_availability_pct?: number;
+  goods_train_regulations?: GoodsRegulationItem[];
   description?: string;
   status: string;
   kpis: PlanKPIs;

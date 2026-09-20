@@ -44,6 +44,9 @@ export const DataSourcesPage: React.FC = () => {
         const trains = await api.getTrainMovements();
         const blocks = await api.getBlockWindows();
         setSampleModalData({ name, content: { train_movements: trains.slice(0, 2), block_windows: blocks.slice(0, 2) } });
+      } else if (name === "GOODS_FORECAST") {
+        const gfc = await api.getGoodsForecast();
+        setSampleModalData({ name, content: gfc });
       } else {
         setSampleModalData({
           name,

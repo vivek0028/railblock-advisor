@@ -65,6 +65,7 @@ def seed_database(force: bool = False):
                         priority_score=score,
                         priority_factors=factors,
                         data_source=item.get("data_source", "BDMS"),
+                        defect_code=item.get("defect_code"),
                         data_label="DEMO DATA"
                     )
                     db.merge(task)

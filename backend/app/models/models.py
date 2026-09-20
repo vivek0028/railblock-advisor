@@ -25,7 +25,8 @@ class MaintenanceTask(Base):
     priority_score = Column(Float, default=0.0)
     status = Column(String(30), default="Pending")  # Pending, Scheduled, Deferred, In_Progress, Completed
     assigned_block_id = Column(String(50), nullable=True)
-    data_source = Column(String(50), default="BDMS")
+    data_source = Column(String(50), default="BDMS")  # TMS, SMMS, TDMS, BDMS
+    defect_code = Column(String(50), nullable=True)  # e.g. USFD-IMR, POINT-STROKE-FAIL, OHE-STAGGER-SAG
     data_label = Column(String(50), default="DEMO DATA")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -79,6 +80,7 @@ class SchedulePlan(Base):
     plan_id = Column(String(50), primary_key=True, index=True)
     plan_name = Column(String(100), nullable=False)
     strategy_type = Column(String(50), nullable=False)  # PLAN_A_CRITICAL, PLAN_B_TRAIN_IMPACT, PLAN_C_BUNDLING, SIMULATION
+    horizon = Column(String(20), default="WEEKLY")  # WEEKLY (7-day), MONTHLY (30-day)
     total_tasks = Column(Integer, default=0)
     scheduled_count = Column(Integer, default=0)
     deferred_count = Column(Integer, default=0)
@@ -86,6 +88,8 @@ class SchedulePlan(Base):
     utilization_rate = Column(Float, default=0.0)
     critical_coverage = Column(Float, default=0.0)
     objective_score = Column(Float, default=0.0)
+    asset_availability_pct = Column(Float, default=96.5)  # Corridor Uptime Index %
+    goods_train_regulations = Column(JSON, default=list)  # List of freight regulations
     status = Column(String(30), default="Generated")  # Draft, Generated, Under Review, Approved, Rejected, Modified
     created_at = Column(DateTime, default=datetime.utcnow)
     approved_by = Column(String(100), nullable=True)

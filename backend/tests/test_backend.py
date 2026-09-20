@@ -395,5 +395,27 @@ def test_deployment_and_route_aliases():
     assert res_dup.status_code == 200
     assert res_dup.json()["status"] == "healthy"
 
+def test_goods_forecast_and_multi_horizon():
+    # 1. Verify /api/goods-forecast returns FOIS records
+    res_gfc = client.get("/api/goods-forecast")
+    assert res_gfc.status_code == 200
+    gfc_data = res_gfc.json()
+    assert "records" in gfc_data
+    assert len(gfc_data["records"]) >= 2
+    assert "loop_regulation_station" in gfc_data["records"][0]
+
+    # 2. Verify Monthly horizon generation
+    res_monthly = client.post("/api/optimization/generate", json={
+        "strategy_type": "PLAN_A_CRITICAL",
+        "horizon": "MONTHLY"
+    })
+    assert res_monthly.status_code == 200
+    monthly_plan = res_monthly.json()["plans"][0]
+    assert monthly_plan["horizon"] == "MONTHLY"
+    assert "asset_availability_pct" in monthly_plan
+    assert monthly_plan["asset_availability_pct"] >= 90.0
+    assert "goods_train_regulations" in monthly_plan
+
+
 
 

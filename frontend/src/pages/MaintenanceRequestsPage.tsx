@@ -39,6 +39,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
   // Filters
   const [search, setSearch] = useState("");
   const [deptFilter, setDeptFilter] = useState<string>(activeRoleDetail.department || "ALL");
+  const [sourceFilter, setSourceFilter] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [sectionFilter, setSectionFilter] = useState("ALL");
@@ -270,14 +271,15 @@ export const MaintenanceRequestsPage: React.FC = () => {
         t.location.toLowerCase().includes(search.toLowerCase()) ||
         t.asset_type.toLowerCase().includes(search.toLowerCase());
       const matchesDept = deptFilter === "ALL" || t.department === deptFilter;
+      const matchesSource = sourceFilter === "ALL" || (t.data_source && t.data_source.toUpperCase() === sourceFilter);
       const matchesStatus = statusFilter === "ALL" || t.status.toUpperCase() === statusFilter.toUpperCase();
       const matchesPriority = priorityFilter === "ALL" || t.criticality === priorityFilter;
       const matchesSection = sectionFilter === "ALL" || t.location === sectionFilter;
       const matchesDate = !dateFilter || t.preferred_date === dateFilter || t.deadline === dateFilter;
 
-      return matchesSearch && matchesDept && matchesStatus && matchesPriority && matchesSection && matchesDate;
+      return matchesSearch && matchesDept && matchesSource && matchesStatus && matchesPriority && matchesSection && matchesDate;
     });
-  }, [tasks, search, deptFilter, statusFilter, priorityFilter, sectionFilter, dateFilter]);
+  }, [tasks, search, deptFilter, sourceFilter, statusFilter, priorityFilter, sectionFilter, dateFilter]);
 
 
   // Validation rules for the selected request
@@ -352,6 +354,36 @@ export const MaintenanceRequestsPage: React.FC = () => {
 
       {/* Filter Bar */}
       <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-2xs space-y-1.5">
+        {/* Dedicated Legacy Silo Ingestion Filter Tabs (SIH PS 26027) */}
+        <div className="flex flex-wrap items-center justify-between gap-1 pb-1.5 border-b border-slate-100">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="text-[10px] uppercase text-slate-400 font-black px-1 tracking-wider">
+              Silo Ingestion Feeds:
+            </span>
+            {[
+              { key: "ALL", label: "All Feeds", count: tasks.length },
+              { key: "TMS", label: "TMS Track Defects", count: tasks.filter(t => (t.data_source || "").toUpperCase() === "TMS").length },
+              { key: "SMMS", label: "SMMS Signal Faults", count: tasks.filter(t => (t.data_source || "").toUpperCase() === "SMMS").length },
+              { key: "TDMS", label: "TDMS OHE Traction", count: tasks.filter(t => (t.data_source || "").toUpperCase() === "TDMS").length },
+              { key: "BDMS", label: "BDMS Requisitions", count: tasks.filter(t => (t.data_source || "").toUpperCase() === "BDMS").length },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setSourceFilter(tab.key)}
+                className={`px-2 py-0.5 rounded transition cursor-pointer text-[10px] font-bold border ${
+                  sourceFilter === tab.key
+                    ? "bg-railway-blue text-white border-railway-blue shadow-2xs"
+                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span className="ml-1 opacity-80">({tab.count})</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5 text-xs">
           {/* Search */}
           <div className="relative col-span-2">
@@ -482,6 +514,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
                 <tr className="text-slate-700 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wider">
                   <th className="py-1.5 px-2.5">Request ID</th>
                   <th className="py-1.5 px-2">Dept</th>
+                  <th className="py-1.5 px-2">Silo / Defect</th>
                   <th className="py-1.5 px-2">Section</th>
                   <th className="py-1.5 px-2.5">Activity</th>
                   <th className="py-1.5 px-2">Duration</th>
@@ -494,7 +527,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
               <tbody className="divide-y divide-slate-100">
                 {filteredTasks.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-10 text-slate-400">
+                    <td colSpan={10} className="text-center py-10 text-slate-400">
                       No maintenance requests match current filter criteria.
                     </td>
                   </tr>
@@ -516,6 +549,23 @@ export const MaintenanceRequestsPage: React.FC = () => {
                         </td>
                         <td className="py-1.5 px-2">
                           <DepartmentBadge department={t.department} />
+                        </td>
+                        <td className="py-1.5 px-2 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded w-fit ${
+                              t.data_source === "TMS" ? "bg-blue-100 text-blue-800 border border-blue-200" :
+                              t.data_source === "SMMS" ? "bg-purple-100 text-purple-800 border border-purple-200" :
+                              t.data_source === "TDMS" ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                              "bg-slate-100 text-slate-700 border border-slate-200"
+                            }`}>
+                              {t.data_source || "BDMS"}
+                            </span>
+                            {t.defect_code && (
+                              <span className="text-[9px] font-mono text-slate-500 font-bold truncate max-w-[95px]" title={t.defect_code}>
+                                {t.defect_code}
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="py-1.5 px-2 font-medium text-slate-700 whitespace-nowrap text-[11px]">
                           {t.location}
@@ -614,6 +664,21 @@ export const MaintenanceRequestsPage: React.FC = () => {
                   <div className="flex justify-between items-center">
                     <span className="font-bold text-slate-900 text-xs">{selectedTask.asset_type}</span>
                     <span className="font-mono text-[10px] text-slate-500 font-semibold">{selectedTask.location}</span>
+                  </div>
+                  <div className="flex items-center space-x-1.5 py-0.5">
+                    <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${
+                      selectedTask.data_source === "TMS" ? "bg-blue-100 text-blue-800 border border-blue-200" :
+                      selectedTask.data_source === "SMMS" ? "bg-purple-100 text-purple-800 border border-purple-200" :
+                      selectedTask.data_source === "TDMS" ? "bg-amber-100 text-amber-800 border border-amber-200" :
+                      "bg-slate-100 text-slate-700 border border-slate-200"
+                    }`}>
+                      Feed: {selectedTask.data_source || "BDMS"}
+                    </span>
+                    {selectedTask.defect_code && (
+                      <span className="text-[9px] font-mono text-slate-700 bg-white border border-slate-200 px-1 py-0.2 rounded font-bold">
+                        Defect: {selectedTask.defect_code}
+                      </span>
+                    )}
                   </div>
                   <p className="text-[11px] text-slate-600 line-clamp-2 leading-tight">{selectedTask.description}</p>
                   <div className="flex items-center justify-between pt-1 text-[10px] font-mono border-t border-slate-200/60">
