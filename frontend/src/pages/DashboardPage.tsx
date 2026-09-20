@@ -81,6 +81,45 @@ const PRIORITY_COLORS: Record<string, string> = {
   Low: "#64748B",      // Slate
 };
 
+// High-contrast, crystal-clear custom tooltips for Recharts
+const CustomPieTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    return (
+      <div className="bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 shadow-2xl text-xs space-y-1 z-50">
+        <div className="flex items-center space-x-2">
+          <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: data.payload.color }} />
+          <span className="font-extrabold text-white text-xs">{data.name} Department</span>
+        </div>
+        <div className="text-slate-200 text-xs font-mono flex items-center space-x-1.5 pt-0.5 border-t border-slate-800">
+          <span className="text-slate-400">Demands:</span>
+          <span className="font-black text-amber-300 text-sm tracking-wide">{data.value} tasks</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const CustomBarTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    return (
+      <div className="bg-slate-900 border border-slate-700 rounded-xl px-3.5 py-2.5 shadow-2xl text-xs space-y-1 z-50">
+        <div className="font-extrabold text-blue-300 text-xs flex items-center space-x-1.5">
+          <span className="w-2 h-2 rounded-full" style={{ backgroundColor: data.payload.fill }} />
+          <span>{label} Criticality</span>
+        </div>
+        <div className="text-slate-200 text-xs font-mono flex items-center space-x-1.5 pt-0.5 border-t border-slate-800">
+          <span className="text-slate-400">Demands:</span>
+          <span className="font-black text-amber-300 text-sm tracking-wide">{data.value} tasks</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { period, setPeriod, corridor } = usePlanning();
@@ -766,10 +805,7 @@ export const DashboardPage: React.FC = () => {
                         <Cell key={`cell-${index}`} fill={entry.color} />
                       ))}
                     </Pie>
-                    <Tooltip
-                      formatter={(value: any, name: any) => [`${value} tasks`, name]}
-                      contentStyle={{ backgroundColor: "#0F172A", borderRadius: "8px", color: "#fff", fontSize: "11px" }}
-                    />
+                    <Tooltip content={<CustomPieTooltip />} />
                     <Legend
                       verticalAlign="bottom"
                       iconType="circle"
@@ -812,10 +848,7 @@ export const DashboardPage: React.FC = () => {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
                     <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#475569" }} axisLine={{ stroke: "#CBD5E1" }} />
                     <YAxis tick={{ fontSize: 11, fill: "#475569" }} axisLine={{ stroke: "#CBD5E1" }} allowDecimals={false} />
-                    <Tooltip
-                      formatter={(value: any) => [`${value} tasks`, "Demands"]}
-                      contentStyle={{ backgroundColor: "#0F172A", borderRadius: "8px", color: "#fff", fontSize: "11px" }}
-                    />
+                    <Tooltip content={<CustomBarTooltip />} />
                     <Bar dataKey="count" radius={[6, 6, 0, 0]}>
                       {priorityBarData.map((entry, index) => (
                         <Cell key={`bar-${index}`} fill={entry.fill} />
