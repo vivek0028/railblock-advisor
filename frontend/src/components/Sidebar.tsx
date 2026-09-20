@@ -30,10 +30,10 @@ const PRIMARY_NAV_ITEMS: NavItem[] = [
   { name: "Dashboard", path: "/dashboard", icon: LayoutDashboard, step: 1 },
   { name: "Maintenance Requests", path: "/requests", icon: ClipboardList, badge: "BDMS", step: 2 },
   { name: "Conflict Detection", path: "/conflicts", icon: AlertTriangle, step: 3 },
-  { name: "Optimized Block Plans", path: "/optimisation", icon: Cpu, badge: "CP-SAT", step: 4 },
+  { name: "Optimized Block Plans", path: "/optimizer", icon: Cpu, badge: "CP-SAT", step: 4 },
   { name: "Explainability", path: "/explainability", icon: HelpCircle, step: 5 },
   { name: "Approval", path: "/approval", icon: CheckSquare, step: 6 },
-  { name: "Audit History", path: "/audit-history", icon: History, step: 7 },
+  { name: "Audit History", path: "/audit", icon: History, step: 7 },
 ];
 
 const SECONDARY_NAV_ITEMS: NavItem[] = [

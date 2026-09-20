@@ -27,11 +27,13 @@ export const App: React.FC = () => {
             <Route path="maintenance" element={<MaintenanceRequestsPage />} />
             <Route path="conflicts" element={<ConflictDetectionPage />} />
             <Route path="optimizer" element={<OptimisationResultsPage />} />
-            <Route path="plans" element={<Navigate to="/optimizer" replace />} />
-            <Route path="optimization" element={<Navigate to="/optimizer" replace />} />
+            <Route path="optimisation" element={<OptimisationResultsPage />} />
+            <Route path="optimization" element={<OptimisationResultsPage />} />
+            <Route path="plans" element={<OptimisationResultsPage />} />
             <Route path="explainability" element={<ExplainabilityPage />} />
             <Route path="approval" element={<ApprovalPage />} />
             <Route path="audit" element={<AuditHistoryPage />} />
+            <Route path="audit-history" element={<AuditHistoryPage />} />
             <Route path="workspace" element={<BlockPlanningWorkspacePage />} />
             <Route path="simulation" element={<WhatIfSimulationPage />} />
             <Route path="data-sources" element={<DataSourcesPage />} />
