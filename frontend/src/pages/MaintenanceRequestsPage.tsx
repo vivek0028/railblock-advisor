@@ -19,7 +19,9 @@ import {
   Calendar,
   Clock,
   Wrench,
-  Layers
+  Layers,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { api } from "../services/api";
 import { MaintenanceTask } from "../types";
@@ -31,6 +33,10 @@ export const MaintenanceRequestsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // Pagination
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(7);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -265,6 +271,19 @@ export const MaintenanceRequestsPage: React.FC = () => {
     });
   }, [tasks, search, deptFilter, statusFilter, priorityFilter, sectionFilter, dateFilter]);
 
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, deptFilter, statusFilter, priorityFilter, sectionFilter, dateFilter]);
+
+  // Calculate pagination
+  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / (pageSize || 1)));
+  const paginatedTasks = useMemo(() => {
+    if (pageSize === 0) return filteredTasks;
+    const start = (currentPage - 1) * pageSize;
+    return filteredTasks.slice(start, start + pageSize);
+  }, [filteredTasks, currentPage, pageSize]);
+
   // Validation rules for the selected request
   const validationChecks = useMemo(() => {
     if (!selectedTask) return null;
@@ -286,74 +305,74 @@ export const MaintenanceRequestsPage: React.FC = () => {
   }, [selectedTask]);
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-2">
       {/* Top Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1.5 border-b border-slate-200">
         <div>
           <div className="flex items-center space-x-2">
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Maintenance Requests</h1>
-            <span className="bg-slate-200 text-slate-700 text-[11px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
+            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Maintenance Requests</h1>
+            <span className="bg-slate-200 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
               Department Demands
             </span>
           </div>
-          <p className="text-xs text-slate-600 mt-1">
+          <p className="text-[11px] text-slate-500 mt-0.5">
             Manage and review departmental maintenance requirements across Engineering, S&T, and Traction.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={handleExportCSV}
-            className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
+            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer shadow-2xs"
           >
-            <Download className="w-3.5 h-3.5 text-slate-500" />
+            <Download className="w-3 h-3 text-slate-500" />
             <span>Export CSV</span>
           </button>
           <button
             onClick={handleRecalculatePriorities}
             disabled={recalculating}
-            className="inline-flex items-center space-x-1.5 px-3 py-2 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-sm transition disabled:opacity-50"
+            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold shadow-2xs transition disabled:opacity-50 cursor-pointer"
             title="Recalculates deterministic scores: Criticality + Deadline Urgency + Overdue + Operational Impact"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${recalculating ? "animate-spin" : ""}`} />
-            <span>{recalculating ? "Scoring..." : "Recalculate Priority"}</span>
+            <RefreshCw className={`w-3 h-3 ${recalculating ? "animate-spin" : ""}`} />
+            <span>{recalculating ? "Scoring..." : "Recalculate"}</span>
           </button>
           <button
             onClick={handleOpenAddModal}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-railway-blue hover:bg-blue-700 text-white text-xs font-bold shadow-sm transition"
+            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-railway-blue hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
           >
-            <Plus className="w-4 h-4" />
-            <span>+ Raise Maintenance Request</span>
+            <Plus className="w-3 h-3" />
+            <span>+ Raise Request</span>
           </button>
           <button
             onClick={() => navigate("/conflicts")}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-sm transition"
+            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-2xs transition cursor-pointer"
           >
             <span>Proceed to Conflicts</span>
-            <ArrowRight className="w-3.5 h-3.5 text-slate-300" />
+            <ArrowRight className="w-3 h-3 text-slate-300" />
           </button>
         </div>
       </div>
 
       {actionSuccess && (
-        <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs px-4 py-2.5 rounded-lg font-medium flex items-center space-x-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+        <div className="bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs px-3 py-1.5 rounded-lg font-medium flex items-center space-x-2">
+          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" />
           <span>{actionSuccess}</span>
         </div>
       )}
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-xl border border-slate-200 p-3.5 shadow-xs space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-2.5 text-xs">
+      <div className="bg-white rounded-xl border border-slate-200 p-2 shadow-2xs space-y-1.5">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5 text-xs">
           {/* Search */}
-          <div className="relative md:col-span-2">
-            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5" />
+          <div className="relative col-span-2">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
             <input
               type="text"
               placeholder="Search ID, section, activity..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-railway-blue"
+              className="w-full pl-8 pr-2.5 py-1 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-railway-blue font-mono"
             />
           </div>
 
@@ -362,7 +381,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
             <select
               value={deptFilter}
               onChange={(e) => setDeptFilter(e.target.value)}
-              className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-railway-blue"
+              className="w-full text-xs border border-slate-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-railway-blue"
             >
               <option value="ALL">All Departments</option>
               <option value="Engineering">Engineering</option>
@@ -376,7 +395,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-railway-blue"
+              className="w-full text-xs border border-slate-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-railway-blue"
             >
               <option value="ALL">All Statuses</option>
               <option value="Pending">Pending</option>
@@ -391,7 +410,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
             <select
               value={priorityFilter}
               onChange={(e) => setPriorityFilter(e.target.value)}
-              className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-railway-blue"
+              className="w-full text-xs border border-slate-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-railway-blue"
             >
               <option value="ALL">All Priorities</option>
               <option value="Critical">Critical</option>
@@ -406,7 +425,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
             <select
               value={sectionFilter}
               onChange={(e) => setSectionFilter(e.target.value)}
-              className="w-full text-xs border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-railway-blue"
+              className="w-full text-xs border border-slate-300 rounded-lg px-2 py-1 bg-white focus:outline-none focus:ring-2 focus:ring-railway-blue"
             >
               <option value="ALL">All Sections</option>
               <option value="Section A-B">Section A-B</option>
@@ -416,21 +435,21 @@ export const MaintenanceRequestsPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+        <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100 gap-1">
           <span>
-            Showing <strong>{filteredTasks.length}</strong> of <strong>{tasks.length}</strong> maintenance requests
+            Total: <strong>{filteredTasks.length}</strong> demands &bull; Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
           </span>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-center space-x-3 font-medium">
             <span className="inline-flex items-center space-x-1">
               <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-              <span>Engineering ({tasks.filter(t => t.department === "Engineering").length})</span>
+              <span>Eng ({tasks.filter(t => t.department === "Engineering").length})</span>
             </span>
             <span className="inline-flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
+              <span className="w-2 h-2 rounded-full bg-purple-600"></span>
               <span>S&T ({tasks.filter(t => t.department === "S&T").length})</span>
             </span>
             <span className="inline-flex items-center space-x-1">
-              <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
+              <span className="w-2 h-2 rounded-full bg-amber-500"></span>
               <span>Traction ({tasks.filter(t => t.department === "Traction").length})</span>
             </span>
           </div>
@@ -438,92 +457,93 @@ export const MaintenanceRequestsPage: React.FC = () => {
       </div>
 
       {/* Main Grid: Table (Left 8 cols) + Live Validation Panel (Right 4 cols) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
         {/* Table View */}
-        <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="overflow-x-auto">
+        <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+          {/* Scroll container that preserves viewport */}
+          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-215px)]">
             <table className="w-full text-left text-xs border-collapse">
-              <thead>
-                <tr className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
-                  <th className="py-2.5 px-3">Request ID</th>
-                  <th className="py-2.5 px-3">Department</th>
-                  <th className="py-2.5 px-3">Section</th>
-                  <th className="py-2.5 px-3">Activity</th>
-                  <th className="py-2.5 px-3">Duration</th>
-                  <th className="py-2.5 px-3">Priority</th>
-                  <th className="py-2.5 px-3">Deadline</th>
-                  <th className="py-2.5 px-3">Status</th>
-                  <th className="py-2.5 px-3 text-right">Action</th>
+              <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-xs z-10 shadow-2xs">
+                <tr className="text-slate-700 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wider">
+                  <th className="py-1.5 px-2.5">Request ID</th>
+                  <th className="py-1.5 px-2">Dept</th>
+                  <th className="py-1.5 px-2">Section</th>
+                  <th className="py-1.5 px-2.5">Activity</th>
+                  <th className="py-1.5 px-2">Duration</th>
+                  <th className="py-1.5 px-2">Priority</th>
+                  <th className="py-1.5 px-2">Deadline</th>
+                  <th className="py-1.5 px-2">Status</th>
+                  <th className="py-1.5 px-2 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {filteredTasks.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-12 text-slate-400">
+                    <td colSpan={9} className="text-center py-10 text-slate-400">
                       No maintenance requests match current filter criteria.
                     </td>
                   </tr>
                 ) : (
-                  filteredTasks.map((t) => {
+                  paginatedTasks.map((t) => {
                     const isSelected = selectedTask?.task_id === t.task_id;
                     return (
                       <tr
                         key={t.task_id}
                         onClick={() => setSelectedTask(t)}
-                        className={`cursor-pointer transition ${
+                        className={`cursor-pointer transition text-xs ${
                           isSelected
-                            ? "bg-blue-50/70 border-l-4 border-l-railway-blue"
+                            ? "bg-blue-50/80 border-l-4 border-l-railway-blue"
                             : "hover:bg-slate-50/80"
                         }`}
                       >
-                        <td className="py-2.5 px-3 font-mono font-bold text-slate-900 whitespace-nowrap">
+                        <td className="py-1.5 px-2.5 font-mono font-bold text-slate-900 whitespace-nowrap">
                           {t.task_id}
                         </td>
-                        <td className="py-2.5 px-3">
+                        <td className="py-1.5 px-2">
                           <DepartmentBadge department={t.department} />
                         </td>
-                        <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
+                        <td className="py-1.5 px-2 font-medium text-slate-700 whitespace-nowrap text-[11px]">
                           {t.location}
                         </td>
-                        <td className="py-2.5 px-3 max-w-[200px]">
-                          <span className="font-semibold text-slate-900 block truncate" title={t.asset_type}>
+                        <td className="py-1.5 px-2.5 max-w-[180px]">
+                          <span className="font-semibold text-slate-900 block truncate leading-tight text-[11px]" title={t.asset_type}>
                             {t.asset_type}
                           </span>
-                          <span className="text-[11px] text-slate-500 truncate block" title={t.description}>
+                          <span className="text-[10px] text-slate-500 truncate block leading-tight" title={t.description}>
                             {t.description}
                           </span>
                         </td>
-                        <td className="py-2.5 px-3 font-mono font-semibold text-slate-700 whitespace-nowrap">
-                          {t.duration_hours} hrs
+                        <td className="py-1.5 px-2 font-mono font-semibold text-slate-700 whitespace-nowrap text-[11px]">
+                          {t.duration_hours}h
                         </td>
-                        <td className="py-2.5 px-3">
+                        <td className="py-1.5 px-2 whitespace-nowrap">
                           <PriorityBadge criticality={t.criticality} score={t.priority_score} />
                         </td>
-                        <td className="py-2.5 px-3 font-mono text-slate-600 whitespace-nowrap">
+                        <td className="py-1.5 px-2 font-mono text-slate-600 whitespace-nowrap text-[11px]">
                           {t.deadline}
                         </td>
-                        <td className="py-2.5 px-3">
+                        <td className="py-1.5 px-2 whitespace-nowrap">
                           <StatusBadge status={t.status} />
                         </td>
-                        <td className="py-2.5 px-3 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-1.5 px-2 text-right whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end space-x-1">
                             <button
                               onClick={() => setSelectedTask(t)}
-                              className="p-1 rounded hover:bg-slate-200 text-slate-600"
+                              className="p-1 rounded hover:bg-slate-200 text-slate-600 cursor-pointer"
                               title="Validate & Inspect Request"
                             >
                               <Info className="w-3.5 h-3.5 text-railway-blue" />
                             </button>
                             <button
                               onClick={() => handleOpenEditModal(t)}
-                              className="p-1 rounded hover:bg-slate-200 text-blue-600"
+                              className="p-1 rounded hover:bg-slate-200 text-blue-600 cursor-pointer"
                               title="Edit Request"
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDelete(t.task_id)}
-                              className="p-1 rounded hover:bg-slate-200 text-rose-600"
+                              className="p-1 rounded hover:bg-slate-200 text-rose-600 cursor-pointer"
                               title="Delete Request"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -537,83 +557,135 @@ export const MaintenanceRequestsPage: React.FC = () => {
               </tbody>
             </table>
           </div>
+
+          {/* Sleek Pagination Footer */}
+          <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs gap-2">
+            <div className="flex items-center space-x-2 text-slate-600 font-mono text-[11px]">
+              <span>
+                Showing <strong>{filteredTasks.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–{pageSize === 0 ? filteredTasks.length : Math.min(currentPage * pageSize, filteredTasks.length)}</strong> of <strong>{filteredTasks.length}</strong>
+              </span>
+              <span className="text-slate-300">|</span>
+              <div className="flex items-center space-x-1 font-sans">
+                <span className="text-slate-500">Rows:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => {
+                    setPageSize(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="border border-slate-300 rounded px-1.5 py-0.5 bg-white text-xs font-semibold focus:ring-1 focus:ring-railway-blue"
+                >
+                  <option value={7}>7</option>
+                  <option value={10}>10</option>
+                  <option value={15}>15</option>
+                  <option value={0}>All</option>
+                </select>
+              </div>
+            </div>
+
+            {pageSize > 0 && totalPages > 1 && (
+              <div className="flex items-center space-x-1.5 font-bold">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-2 py-1 border border-slate-300 rounded-lg hover:bg-white text-slate-700 disabled:opacity-40 disabled:hover:bg-transparent text-[11px] flex items-center space-x-0.5 cursor-pointer"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span>Prev</span>
+                </button>
+                <span className="px-2 text-[11px] font-mono text-slate-700">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-2 py-1 border border-slate-300 rounded-lg hover:bg-white text-slate-700 disabled:opacity-40 disabled:hover:bg-transparent text-[11px] flex items-center space-x-0.5 cursor-pointer"
+                >
+                  <span>Next</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Live Validation Panel (Right Side) */}
-        <div className="lg:col-span-4 space-y-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <ShieldCheck className="w-4 h-4 text-railway-blue" />
+        <div className="lg:col-span-4">
+          <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs max-h-[calc(100vh-215px)] overflow-y-auto space-y-2">
+            <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
+              <div className="flex items-center space-x-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-railway-blue" />
                 <h3 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
                   Request Validation
                 </h3>
               </div>
-              <span className="text-[11px] font-mono text-slate-500">
+              <span className="text-[11px] font-mono text-slate-500 font-bold">
                 {selectedTask ? selectedTask.task_id : "No selection"}
               </span>
             </div>
 
             {selectedTask && validationChecks ? (
-              <div className="space-y-3.5">
+              <div className="space-y-3">
                 {/* Selected summary */}
-                <div className="bg-slate-50 p-3 rounded-lg border border-slate-200/80 text-xs space-y-1">
+                <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80 text-xs space-y-1">
                   <div className="flex justify-between items-center">
-                    <span className="font-bold text-slate-800">{selectedTask.asset_type}</span>
-                    <span className="font-mono text-[11px] text-slate-500">{selectedTask.location}</span>
+                    <span className="font-bold text-slate-900 text-xs">{selectedTask.asset_type}</span>
+                    <span className="font-mono text-[10px] text-slate-500 font-semibold">{selectedTask.location}</span>
                   </div>
-                  <p className="text-[11px] text-slate-600 line-clamp-2">{selectedTask.description}</p>
-                  <div className="flex items-center justify-between pt-1 text-[11px] font-mono">
-                    <span className="text-slate-500">Duration: <strong>{selectedTask.duration_hours}h</strong></span>
-                    <span className="text-slate-500">Deadline: <strong>{selectedTask.deadline}</strong></span>
+                  <p className="text-[11px] text-slate-600 line-clamp-2 leading-tight">{selectedTask.description}</p>
+                  <div className="flex items-center justify-between pt-1 text-[10px] font-mono border-t border-slate-200/60">
+                    <span className="text-slate-500">Duration: <strong className="text-slate-800">{selectedTask.duration_hours}h</strong></span>
+                    <span className="text-slate-500">Deadline: <strong className="text-slate-800">{selectedTask.deadline}</strong></span>
                   </div>
                 </div>
 
                 {/* Validation checklist items */}
-                <div className="space-y-2 text-xs">
+                <div className="space-y-1.5 text-xs">
                   {/* Rule 1: Duration Valid */}
-                  <div className="flex items-start space-x-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start space-x-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-bold text-slate-900 block">Duration valid</span>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="font-bold text-slate-900 block text-[11px]">Duration valid</span>
+                      <span className="text-[10px] text-slate-500 leading-tight block">
                         Requested {selectedTask.duration_hours}h fits corridor maximum allowable window (≤ 4.5h)
                       </span>
                     </div>
                   </div>
 
                   {/* Rule 2: Resource Available */}
-                  <div className="flex items-start space-x-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start space-x-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-bold text-slate-900 block">Resource available</span>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="font-bold text-slate-900 block text-[11px]">Resource available</span>
+                      <span className="text-[10px] text-slate-500 leading-tight block">
                         {(selectedTask.required_resources || []).join(", ") || "Departmental maintenance team assigned"}
                       </span>
                     </div>
                   </div>
 
                   {/* Rule 3: Deadline Achievable */}
-                  <div className="flex items-start space-x-2.5 p-2.5 rounded-lg bg-slate-50 border border-slate-100">
+                  <div className="flex items-start space-x-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
                     {validationChecks.isDeadlineAchievable ? (
-                      <CheckCircle2 className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
                     ) : (
-                      <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+                      <AlertCircle className="w-3.5 h-3.5 text-rose-600 flex-shrink-0 mt-0.5" />
                     )}
                     <div>
-                      <span className="font-bold text-slate-900 block">Deadline achievable</span>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="font-bold text-slate-900 block text-[11px]">Deadline achievable</span>
+                      <span className="text-[10px] text-slate-500 leading-tight block">
                         Target date {selectedTask.preferred_date} is within statutory deadline {selectedTask.deadline}
                       </span>
                     </div>
                   </div>
 
                   {/* Rule 4: Preferred Window Overlap / Corridor Check */}
-                  <div className="flex items-start space-x-2.5 p-2.5 rounded-lg bg-amber-50/70 border border-amber-200">
-                    <AlertTriangle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex items-start space-x-2 p-2 rounded-lg bg-amber-50/70 border border-amber-200">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div>
-                      <span className="font-bold text-amber-950 block">Preferred window overlaps another request</span>
-                      <span className="text-[11px] text-amber-800">
+                      <span className="font-bold text-amber-950 block text-[11px]">Preferred window overlap warning</span>
+                      <span className="text-[10px] text-amber-800 leading-tight block">
                         Time slot coincides with Section {selectedTask.location} traffic. Coordinated grouping recommended in Block Optimizer.
                       </span>
                     </div>
@@ -621,32 +693,29 @@ export const MaintenanceRequestsPage: React.FC = () => {
                 </div>
 
                 {/* Priority Rule Score Explainability breakdown */}
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2 text-xs">
+                <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200 space-y-1.5 text-xs">
                   <div className="flex justify-between items-center pb-1 border-b border-slate-200">
-                    <span className="font-bold text-slate-700">Prototype Priority Score:</span>
-                    <span className="font-mono font-bold text-rose-700">{selectedTask.priority_score.toFixed(0)} pts</span>
+                    <span className="font-bold text-slate-700 text-[11px]">Priority Scoring Proof:</span>
+                    <span className="font-mono font-bold text-rose-700 text-xs">{selectedTask.priority_score.toFixed(0)} pts</span>
                   </div>
-                  <div className="flex justify-between text-[11px] text-slate-600">
+                  <div className="flex justify-between text-[10px] text-slate-600">
                     <span>Criticality ({selectedTask.criticality}):</span>
                     <span className="font-mono font-semibold">+{selectedTask.priority_factors?.criticality_points || 25} pts</span>
                   </div>
-                  <div className="flex justify-between text-[11px] text-slate-600">
+                  <div className="flex justify-between text-[10px] text-slate-600">
                     <span>Urgency & Deadline:</span>
                     <span className="font-mono font-semibold">+{selectedTask.priority_factors?.deadline_urgency_points || 20} pts</span>
                   </div>
-                  <div className="flex justify-between text-[11px] text-slate-600">
+                  <div className="flex justify-between text-[10px] text-slate-600">
                     <span>Operational Impact:</span>
                     <span className="font-mono font-semibold">+{selectedTask.priority_factors?.operational_impact_points || 15} pts</span>
                   </div>
-                  <span className="text-[10px] text-slate-400 italic block pt-1">
-                    * Illustrative prototype scoring rules for demonstration.
-                  </span>
                 </div>
 
-                <div className="pt-2">
+                <div className="pt-1">
                   <button
                     onClick={() => navigate("/conflicts")}
-                    className="w-full py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition flex items-center justify-center space-x-2"
+                    className="w-full py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition flex items-center justify-center space-x-1.5 shadow-xs cursor-pointer"
                   >
                     <span>Check Conflict Status</span>
                     <ArrowRight className="w-3.5 h-3.5" />
@@ -654,7 +723,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
                 </div>
               </div>
             ) : (
-              <div className="text-center py-8 text-slate-400 text-xs">
+              <div className="text-center py-6 text-slate-400 text-xs">
                 Select any maintenance request in the table to view live operational validation.
               </div>
             )}

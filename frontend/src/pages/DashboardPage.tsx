@@ -297,120 +297,120 @@ export const DashboardPage: React.FC = () => {
   const { kpis } = summary;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {/* 1. Primary KPI Cards Grid (4 Essential Railway Metrics) */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
         {/* KPI 1: Pending Requests */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between card-elevation-hover">
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-xs flex flex-col justify-between card-elevation-hover">
           <div className="flex items-start justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Pending Requests
             </span>
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-railway-blue flex items-center justify-center font-bold">
-              <ClipboardList className="w-4.5 h-4.5" />
+            <div className="w-7 h-7 rounded-lg bg-blue-50 text-railway-blue flex items-center justify-center font-bold">
+              <ClipboardList className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+          <div className="mt-1.5">
+            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight leading-none">
               {kpis.total_maintenance_requests}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[10px] text-slate-500 mt-1 leading-tight">
               Departmental requisitions awaiting allocation
             </p>
           </div>
-          <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
             <span className="inline-flex items-center text-blue-700 font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mr-1.5" />
-              BDMS Synchronized
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-600 mr-1" />
+              BDMS Synced
             </span>
-            <Link to="/requests" className="text-railway-blue hover:underline font-bold text-[11px]">
+            <Link to="/requests" className="text-railway-blue hover:underline font-bold text-[10px]">
               Manage &rarr;
             </Link>
           </div>
         </div>
 
         {/* KPI 2: Blocks Planned */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between card-elevation-hover">
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-xs flex flex-col justify-between card-elevation-hover">
           <div className="flex items-start justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Blocks Planned
             </span>
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
-              <CheckCircle2 className="w-4.5 h-4.5" />
+            <div className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+              <CheckCircle2 className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+          <div className="mt-1.5">
+            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight leading-none">
               {kpis.scheduled_tasks || 22}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[10px] text-slate-500 mt-1 leading-tight">
               Approved or scheduled block windows
             </p>
           </div>
-          <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
             <span className="inline-flex items-center text-emerald-700 font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1.5" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 mr-1" />
               {activePlan?.status || "Optimized"}
             </span>
-            <Link to="/optimizer" className="text-railway-blue hover:underline font-bold text-[11px]">
+            <Link to="/optimizer" className="text-railway-blue hover:underline font-bold text-[10px]">
               Inspect Plan &rarr;
             </Link>
           </div>
         </div>
 
         {/* KPI 3: Conflicts Detected */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between card-elevation-hover">
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-xs flex flex-col justify-between card-elevation-hover">
           <div className="flex items-start justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Conflicts Detected
             </span>
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
-              <AlertTriangle className="w-4.5 h-4.5" />
+            <div className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+              <AlertTriangle className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+          <div className="mt-1.5">
+            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight leading-none">
               {kpis.conflicts_detected}
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[10px] text-slate-500 mt-1 leading-tight">
               Timetable & resource clashes identified
             </p>
           </div>
-          <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
             <span className="inline-flex items-center text-amber-700 font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5" />
-              Pre-Approval Checks
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1" />
+              Pre-Approval
             </span>
-            <Link to="/conflicts" className="text-amber-800 hover:underline font-bold text-[11px]">
+            <Link to="/conflicts" className="text-amber-800 hover:underline font-bold text-[10px]">
               Resolve &rarr;
             </Link>
           </div>
         </div>
 
         {/* KPI 4: Resource Utilization */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between card-elevation-hover">
+        <div className="bg-white rounded-xl border border-slate-200/90 p-3 sm:p-3.5 shadow-xs flex flex-col justify-between card-elevation-hover">
           <div className="flex items-start justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Resource Utilization
             </span>
-            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
-              <Layers className="w-4.5 h-4.5" />
+            <div className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center font-bold">
+              <Layers className="w-3.5 h-3.5" />
             </div>
           </div>
-          <div className="mt-3">
-            <div className="text-3xl font-black text-slate-900 font-mono tracking-tight">
+          <div className="mt-1.5">
+            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight leading-none">
               {kpis.block_utilisation_rate}%
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">
+            <p className="text-[10px] text-slate-500 mt-1 leading-tight">
               Used block hours vs available traffic windows
             </p>
           </div>
-          <div className="mt-3.5 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="mt-2 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px]">
             <span className="inline-flex items-center text-purple-700 font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-600 mr-1.5" />
-              OR-Tools Optimized
+              <span className="w-1.5 h-1.5 rounded-full bg-purple-600 mr-1" />
+              OR-Tools
             </span>
-            <Link to="/explainability" className="text-railway-blue hover:underline font-bold text-[11px]">
+            <Link to="/explainability" className="text-railway-blue hover:underline font-bold text-[10px]">
               Explain &rarr;
             </Link>
           </div>
@@ -418,11 +418,11 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* 2. Modern Segmented Tab Switcher */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 p-2 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="bg-white rounded-xl border border-slate-200/90 p-1.5 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1.5">
           <button
             onClick={() => setActiveSectionTab("schedule")}
-            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+            className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition cursor-pointer ${
               activeSectionTab === "schedule"
                 ? "bg-railway-blue text-white shadow-xs font-black"
                 : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
