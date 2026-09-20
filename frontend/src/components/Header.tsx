@@ -62,12 +62,9 @@ export const Header: React.FC = () => {
               <div>
                 <div className="flex items-center space-x-2">
                   <span className="font-black text-base sm:text-lg tracking-wider text-white">RAILOPTIBLOCK</span>
-                  <span className="bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 text-[9px] font-bold px-1.5 py-0.2 rounded font-mono">
-                    OR-TOOLS CP-SAT
-                  </span>
                 </div>
                 <p className="text-[10px] sm:text-[11px] text-slate-300 font-medium tracking-normal -mt-0.5 leading-tight">
-                  AI-Assisted Maintenance Block Planning &bull; Indian Railways
+                  AI-Assisted Maintenance Block Planning
                 </p>
               </div>
             </Link>

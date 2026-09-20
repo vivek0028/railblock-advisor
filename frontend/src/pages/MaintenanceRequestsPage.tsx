@@ -334,13 +334,6 @@ export const MaintenanceRequestsPage: React.FC = () => {
             <span>{recalculating ? "Scoring..." : "Recalculate"}</span>
           </button>
           <button
-            onClick={handleOpenAddModal}
-            className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-railway-blue hover:bg-blue-700 text-white text-xs font-bold shadow-2xs transition cursor-pointer"
-          >
-            <Plus className="w-3 h-3" />
-            <span>+ Raise Request</span>
-          </button>
-          <button
             onClick={() => navigate("/conflicts")}
             className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-lg bg-slate-900 hover:bg-black text-white text-xs font-bold shadow-2xs transition cursor-pointer"
           >
