@@ -34,9 +34,6 @@ export const MaintenanceRequestsPage: React.FC = () => {
   const [recalculating, setRecalculating] = useState(false);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  // Pagination
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(7);
 
   // Filters
   const [search, setSearch] = useState("");
@@ -271,18 +268,6 @@ export const MaintenanceRequestsPage: React.FC = () => {
     });
   }, [tasks, search, deptFilter, statusFilter, priorityFilter, sectionFilter, dateFilter]);
 
-  // Reset page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [search, deptFilter, statusFilter, priorityFilter, sectionFilter, dateFilter]);
-
-  // Calculate pagination
-  const totalPages = Math.max(1, Math.ceil(filteredTasks.length / (pageSize || 1)));
-  const paginatedTasks = useMemo(() => {
-    if (pageSize === 0) return filteredTasks;
-    const start = (currentPage - 1) * pageSize;
-    return filteredTasks.slice(start, start + pageSize);
-  }, [filteredTasks, currentPage, pageSize]);
 
   // Validation rules for the selected request
   const validationChecks = useMemo(() => {
@@ -437,7 +422,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
 
         <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 pt-1 border-t border-slate-100 gap-1">
           <span>
-            Total: <strong>{filteredTasks.length}</strong> demands &bull; Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong>
+            Total: <strong>{filteredTasks.length}</strong> demands &bull; <strong className="text-slate-800">Unified Continuous Table</strong> (10+ rows visible)
           </span>
           <div className="flex items-center space-x-3 font-medium">
             <span className="inline-flex items-center space-x-1">
@@ -460,8 +445,8 @@ export const MaintenanceRequestsPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
         {/* Table View */}
         <div className="lg:col-span-8 bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
-          {/* Scroll container that preserves viewport */}
-          <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-215px)]">
+          {/* Scroll container that shows minimum 10 rows and preserves single screen */}
+          <div className="overflow-x-auto overflow-y-auto min-h-[380px] max-h-[calc(100vh-215px)]">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-xs z-10 shadow-2xs">
                 <tr className="text-slate-700 font-bold border-b border-slate-200 text-[11px] uppercase tracking-wider">
@@ -484,7 +469,7 @@ export const MaintenanceRequestsPage: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  paginatedTasks.map((t) => {
+                  filteredTasks.map((t) => {
                     const isSelected = selectedTask?.task_id === t.task_id;
                     return (
                       <tr
@@ -558,62 +543,28 @@ export const MaintenanceRequestsPage: React.FC = () => {
             </table>
           </div>
 
-          {/* Sleek Pagination Footer */}
+          {/* Unified Table Status Footer */}
           <div className="px-3 py-2 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between text-xs gap-2">
             <div className="flex items-center space-x-2 text-slate-600 font-mono text-[11px]">
               <span>
-                Showing <strong>{filteredTasks.length === 0 ? 0 : (currentPage - 1) * pageSize + 1}–{pageSize === 0 ? filteredTasks.length : Math.min(currentPage * pageSize, filteredTasks.length)}</strong> of <strong>{filteredTasks.length}</strong>
+                Showing <strong>{filteredTasks.length}</strong> of <strong>{tasks.length}</strong> demands
               </span>
               <span className="text-slate-300">|</span>
-              <div className="flex items-center space-x-1 font-sans">
-                <span className="text-slate-500">Rows:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => {
-                    setPageSize(Number(e.target.value));
-                    setCurrentPage(1);
-                  }}
-                  className="border border-slate-300 rounded px-1.5 py-0.5 bg-white text-xs font-semibold focus:ring-1 focus:ring-railway-blue"
-                >
-                  <option value={7}>7</option>
-                  <option value={10}>10</option>
-                  <option value={15}>15</option>
-                  <option value={0}>All</option>
-                </select>
-              </div>
+              <span className="text-slate-500 font-sans">
+                Continuous single-screen table &bull; min 10+ rows visible (scroll table to view all)
+              </span>
             </div>
 
-            {pageSize > 0 && totalPages > 1 && (
-              <div className="flex items-center space-x-1.5 font-bold">
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                  disabled={currentPage === 1}
-                  className="px-2 py-1 border border-slate-300 rounded-lg hover:bg-white text-slate-700 disabled:opacity-40 disabled:hover:bg-transparent text-[11px] flex items-center space-x-0.5 cursor-pointer"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Prev</span>
-                </button>
-                <span className="px-2 text-[11px] font-mono text-slate-700">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                  disabled={currentPage === totalPages}
-                  className="px-2 py-1 border border-slate-300 rounded-lg hover:bg-white text-slate-700 disabled:opacity-40 disabled:hover:bg-transparent text-[11px] flex items-center space-x-0.5 cursor-pointer"
-                >
-                  <span>Next</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            )}
+            <div className="flex items-center space-x-1.5 text-[11px]">
+              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+              <span className="font-semibold text-slate-700">All Demands in Single View</span>
+            </div>
           </div>
         </div>
 
         {/* Live Validation Panel (Right Side) */}
         <div className="lg:col-span-4">
-          <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs max-h-[calc(100vh-215px)] overflow-y-auto space-y-2">
+          <div className="bg-white rounded-xl border border-slate-200 p-2.5 shadow-xs min-h-[380px] max-h-[calc(100vh-215px)] overflow-y-auto space-y-2">
             <div className="flex items-center justify-between pb-1.5 border-b border-slate-100">
               <div className="flex items-center space-x-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-railway-blue" />
