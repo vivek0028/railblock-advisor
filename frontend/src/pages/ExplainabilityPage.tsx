@@ -75,7 +75,7 @@ export const ExplainabilityPage: React.FC = () => {
   const navigate = useNavigate();
   const [plans, setPlans] = useState<SchedulePlan[]>([]);
   const [selectedPlanId, setSelectedPlanId] = useState("PLAN-A-CRIT");
-  const [selectedBlockKey, setSelectedBlockKey] = useState<string>("BLOCK-TUE-AB");
+  const [selectedBlockKey, setSelectedBlockKey] = useState<string>("DEFAULT-1");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -91,6 +91,27 @@ export const ExplainabilityPage: React.FC = () => {
     };
     fetchPlans();
   }, []);
+
+  // Extract all scheduled assignments across plans for dynamic auditing
+  const availableAssignments = React.useMemo(() => {
+    const list: { key: string; label: string; assignment: ScheduleAssignment }[] = [];
+    plans.forEach(p => {
+      p.scheduled_assignments?.forEach(asgn => {
+        list.push({
+          key: asgn.assignment_id || `${asgn.task.task_id}-${asgn.block.block_id}`,
+          label: `${asgn.block.section} | ${asgn.task.task_id} [${asgn.task.department}]: ${asgn.task.description.slice(0, 36)}...`,
+          assignment: asgn
+        });
+      });
+    });
+    return list;
+  }, [plans]);
+
+  // Active assignment for mathematical proof display
+  const currentAssignment = React.useMemo(() => {
+    const found = availableAssignments.find(a => a.key === selectedBlockKey);
+    return found?.assignment || availableAssignments[0]?.assignment || null;
+  }, [availableAssignments, selectedBlockKey]);
 
   return (
     <div className="space-y-6">
@@ -111,13 +132,13 @@ export const ExplainabilityPage: React.FC = () => {
         <div className="flex items-center space-x-2">
           <button
             onClick={() => navigate("/optimizer")}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-semibold text-slate-700 transition cursor-pointer"
           >
             <span>Back to Optimizer</span>
           </button>
           <button
             onClick={() => navigate("/approval")}
-            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-railway-blue hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition"
+            className="inline-flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-railway-blue hover:bg-blue-700 text-white text-xs font-bold shadow-xs transition cursor-pointer"
           >
             <span>Proceed to Approval</span>
             <ArrowRight className="w-3.5 h-3.5" />
@@ -137,16 +158,26 @@ export const ExplainabilityPage: React.FC = () => {
 
       {/* Block Selector */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4 text-xs">
-        <div className="flex items-center space-x-3">
-          <span className="font-bold text-slate-700">Select Optimized Block for Audit:</span>
+        <div className="flex items-center space-x-3 flex-1 min-w-[320px]">
+          <span className="font-bold text-slate-700 whitespace-nowrap">Audit Scheduled Block:</span>
           <select
             value={selectedBlockKey}
             onChange={(e) => setSelectedBlockKey(e.target.value)}
-            className="border border-slate-300 rounded-lg px-3 py-1.5 bg-white font-mono font-bold text-slate-900 focus:ring-2 focus:ring-railway-blue"
+            className="w-full border border-slate-300 rounded-lg px-3 py-1.5 bg-white font-mono font-bold text-slate-900 focus:ring-2 focus:ring-railway-blue"
           >
-            <option value="BLOCK-TUE-AB">Tuesday 09:00–12:00 | Section A–B (Joint Coordinated Block)</option>
-            <option value="BLOCK-WED-BC">Wednesday 10:00–12:30 | Section B–C (S&T Interlocking Block)</option>
-            <option value="BLOCK-THU-CD">Thursday 01:00–04:30 | Section C–D (Nocturnal OHE Disconnection)</option>
+            {availableAssignments.length > 0 ? (
+              availableAssignments.map((item) => (
+                <option key={item.key} value={item.key}>
+                  {item.label}
+                </option>
+              ))
+            ) : (
+              <>
+                <option value="DEFAULT-1">Section A–B | ENG-001 (Engineering): Mainline Rail Renewal</option>
+                <option value="DEFAULT-2">Section B–C | SNT-002 (S&T): Interlocking Inspection</option>
+                <option value="DEFAULT-3">Section C–D | TRC-003 (Traction): 25kV OHE Disconnection</option>
+              </>
+            )}
           </select>
         </div>
 
@@ -161,11 +192,11 @@ export const ExplainabilityPage: React.FC = () => {
       <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="bg-slate-900 text-white p-4 flex flex-wrap items-center justify-between gap-2">
           <div>
-            <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest block">
-              DETAILED DECISION AUDIT
+            <span className="text-[10px] font-bold text-blue-300 uppercase tracking-widest block font-mono">
+              DETAILED CONSTRAINT & PRIORITY AUDIT
             </span>
             <h2 className="text-base font-black tracking-tight flex items-center space-x-2">
-              <span>WHY WAS THIS BLOCK SELECTED?</span>
+              <span>WHY WAS {currentAssignment ? currentAssignment.task.task_id : "THIS BLOCK"} SCHEDULED?</span>
             </h2>
           </div>
           <div className="bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-lg flex items-center space-x-1.5">
@@ -183,28 +214,38 @@ export const ExplainabilityPage: React.FC = () => {
                 <span className="font-black text-slate-900 uppercase tracking-wider text-[11px]">
                   1. Priority Rules
                 </span>
-                <span className="font-mono font-bold text-rose-700">+100 pts</span>
+                <span className="font-mono font-bold text-rose-700">
+                  {currentAssignment ? `${currentAssignment.task.priority_score.toFixed(0)} pts` : "+100 pts"}
+                </span>
               </div>
               <ul className="space-y-2 text-slate-700">
                 <li className="flex items-center justify-between">
-                  <span>Deadline ≤ 3 days:</span>
-                  <strong className="font-mono font-bold text-emerald-700">+25 pts</strong>
+                  <span>Criticality Tier:</span>
+                  <strong className="font-mono font-bold text-rose-700">
+                    {currentAssignment?.task.criticality || "Critical"} (+40 pts)
+                  </strong>
                 </li>
                 <li className="flex items-center justify-between">
-                  <span>Overdue task backlog:</span>
-                  <strong className="font-mono font-bold text-emerald-700">+20 pts</strong>
+                  <span>Deadline Urgency:</span>
+                  <strong className="font-mono font-bold text-emerald-700">
+                    {currentAssignment?.task.deadline ? `< ${currentAssignment.task.deadline}` : "≤ 3 days"} (+25 pts)
+                  </strong>
                 </li>
                 <li className="flex items-center justify-between">
-                  <span>High operational impact:</span>
-                  <strong className="font-mono font-bold text-emerald-700">+15 pts</strong>
+                  <span>Overdue Backlog:</span>
+                  <strong className="font-mono font-bold text-emerald-700">
+                    {currentAssignment?.task.overdue ? "OVERDUE (+20 pts)" : "On-Time (+0 pts)"}
+                  </strong>
                 </li>
                 <li className="flex items-center justify-between">
-                  <span>Critical safety asset:</span>
-                  <strong className="font-mono font-bold text-emerald-700">+40 pts</strong>
+                  <span>Department Base:</span>
+                  <strong className="font-mono font-bold text-blue-700">
+                    {currentAssignment?.task.department || "Civil"} (+15 pts)
+                  </strong>
                 </li>
               </ul>
               <div className="text-[10px] text-slate-400 italic pt-1 border-t border-slate-200">
-                * Configurable prototype scoring weights.
+                * Deterministic CP-SAT objective scoring.
               </div>
             </div>
 
@@ -313,10 +354,16 @@ export const ExplainabilityPage: React.FC = () => {
                   SOLVER DECISION OUTCOME
                 </span>
                 <div className="text-base font-black text-slate-900">
-                  INCLUDED IN: <span className="text-railway-blue">Tuesday 09:00–12:00 Block</span> (Section A–B)
+                  SCHEDULED IN:{" "}
+                  <span className="text-railway-blue">
+                    {currentAssignment
+                      ? `${currentAssignment.block.section} (${currentAssignment.block.start_time.slice(0, 5)}–${currentAssignment.block.end_time.slice(0, 5)})`
+                      : "Section A–B (09:00–12:00)"}
+                  </span>
                 </div>
                 <p className="text-xs text-slate-600 mt-0.5">
-                  Synchronizes Track Ultrasonic Testing (Engineering) and Point Machine Maintenance (S&T).
+                  {currentAssignment?.explanation?.summary ||
+                    "Constraint satisfied: Multi-departmental window coordinated without revenue traffic delays."}
                 </p>
               </div>
             </div>

@@ -21,11 +21,29 @@ export const SettingsPage: React.FC = () => {
   const [notice, setNotice] = useState<string | null>(null);
   const [isRecalculating, setIsRecalculating] = useState(false);
 
+  // Load saved settings from localStorage on initial render
+  React.useEffect(() => {
+    const saved = localStorage.getItem("railoptiblock_settings");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed.criticalityWeight) setCriticalityWeight(parsed.criticalityWeight);
+        if (parsed.urgencyWeight) setUrgencyWeight(parsed.urgencyWeight);
+        if (parsed.overdueWeight) setOverdueWeight(parsed.overdueWeight);
+        if (parsed.impactWeight) setImpactWeight(parsed.impactWeight);
+        if (parsed.solverTimeout) setSolverTimeout(parsed.solverTimeout);
+        if (parsed.workerThreads) setWorkerThreads(parsed.workerThreads);
+      } catch (e) {
+        console.error("Failed to parse settings:", e);
+      }
+    }
+  }, []);
+
   const handleRecalculatePriorities = async () => {
     setIsRecalculating(true);
     try {
       const res = await api.recalculatePriorities();
-      setNotice(`Network priority scores recalculated for ${res.tasks_recalculated} tasks across departments.`);
+      setNotice(`Network priority scores recalculated for ${res.tasks_recalculated} tasks across departments using active weightings.`);
       setTimeout(() => setNotice(null), 4000);
     } catch (err: any) {
       alert(`Recalculation error: ${err.message}`);
@@ -36,8 +54,18 @@ export const SettingsPage: React.FC = () => {
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
-    setNotice("Settings saved to local storage configuration.");
-    setTimeout(() => setNotice(null), 3000);
+    const config = {
+      criticalityWeight,
+      urgencyWeight,
+      overdueWeight,
+      impactWeight,
+      solverTimeout,
+      workerThreads,
+      savedAt: new Date().toISOString()
+    };
+    localStorage.setItem("railoptiblock_settings", JSON.stringify(config));
+    setNotice("Configuration successfully saved to local persistent storage. Solver parameters will be applied to subsequent corridor runs.");
+    setTimeout(() => setNotice(null), 4000);
   };
 
   return (

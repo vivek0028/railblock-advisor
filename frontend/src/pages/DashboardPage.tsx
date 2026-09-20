@@ -92,6 +92,8 @@ export const DashboardPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [selectedBlockItem, setSelectedBlockItem] = useState<TimelineBlockItem | null>(null);
   const [activeViewMode, setActiveViewMode] = useState<"WEEK" | "MONTH">("WEEK");
+  const [activeSectionTab, setActiveSectionTab] = useState<"schedule" | "analytics" | "tasks">("schedule");
+  const [criticalTaskSearch, setCriticalTaskSearch] = useState("");
 
   // Selected date in Month view
   const [selectedMonthDate, setSelectedMonthDate] = useState<string>("2026-09-22");
@@ -257,54 +259,7 @@ export const DashboardPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* 1. Header & Planning Period Controls */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 px-5 py-3 shadow-xs flex items-center justify-between">
-        <div className="flex items-center space-x-2 text-xs font-bold text-slate-700 uppercase tracking-wider">
-          <CalendarDays className="w-4 h-4 text-railway-blue" />
-          <span>Corridor Schedule</span>
-        </div>
-
-        {/* Working Week / Month Switcher */}
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200 text-xs font-bold">
-            <button
-              onClick={() => {
-                setActiveViewMode("WEEK");
-                setPeriod("Week 38 (18 - 24 Sep 2026)");
-              }}
-              className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
-                activeViewMode === "WEEK"
-                  ? "bg-railway-blue text-white shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <CalendarDays className="w-3.5 h-3.5" />
-              <span>Week View</span>
-            </button>
-            <button
-              onClick={() => {
-                setActiveViewMode("MONTH");
-                setPeriod("Month (September 2026)");
-              }}
-              className={`px-3.5 py-1.5 rounded-lg transition cursor-pointer flex items-center space-x-1.5 ${
-                activeViewMode === "MONTH"
-                  ? "bg-railway-blue text-white shadow-xs font-bold"
-                  : "text-slate-600 hover:text-slate-900"
-              }`}
-            >
-              <Calendar className="w-3.5 h-3.5" />
-              <span>Month (September 2026)</span>
-            </button>
-          </div>
-
-          <div className="hidden sm:flex items-center space-x-2 text-xs text-slate-700 bg-slate-50 border border-slate-200/90 px-3 py-1.5 rounded-xl font-semibold">
-            <Calendar className="w-3.5 h-3.5 text-railway-blue" />
-            <span>{period}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 2. Primary KPI Cards Grid (4 Exact Required KPIs) */}
+      {/* 1. Primary KPI Cards Grid (4 Essential Railway Metrics) */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Pending Requests */}
         <div className="bg-white rounded-2xl border border-slate-200/90 p-5 shadow-xs flex flex-col justify-between card-elevation-hover">
@@ -423,9 +378,90 @@ export const DashboardPage: React.FC = () => {
         </div>
       </div>
 
+      {/* 2. Modern Segmented Tab Switcher */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 p-2 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            onClick={() => setActiveSectionTab("schedule")}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeSectionTab === "schedule"
+                ? "bg-railway-blue text-white shadow-xs font-black"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <CalendarDays className="w-4 h-4" />
+            <span>Corridor Schedule Matrix</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSectionTab("analytics")}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeSectionTab === "analytics"
+                ? "bg-railway-blue text-white shadow-xs font-black"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <BarChart3 className="w-4 h-4" />
+            <span>Demand & Priority Analytics</span>
+          </button>
+
+          <button
+            onClick={() => setActiveSectionTab("tasks")}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+              activeSectionTab === "tasks"
+                ? "bg-rose-600 text-white shadow-xs font-black"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+            }`}
+          >
+            <AlertCircle className="w-4 h-4" />
+            <span>Critical Attention Tasks</span>
+            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded-full font-bold ${
+              activeSectionTab === "tasks" ? "bg-white text-rose-700" : "bg-rose-100 text-rose-800"
+            }`}>
+              {summary.critical_tasks_requiring_attention.length}
+            </span>
+          </button>
+        </div>
+
+        {activeSectionTab === "schedule" && (
+          <div className="flex items-center space-x-2 px-1">
+            <span className="text-xs font-semibold text-slate-500">Period Mode:</span>
+            <div className="flex items-center bg-slate-100 p-0.5 rounded-xl border border-slate-200 text-xs font-bold">
+              <button
+                onClick={() => {
+                  setActiveViewMode("WEEK");
+                  setPeriod("Week 38 (18 - 24 Sep 2026)");
+                }}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  activeViewMode === "WEEK"
+                    ? "bg-white text-railway-blue shadow-xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Week (7 Days)
+              </button>
+              <button
+                onClick={() => {
+                  setActiveViewMode("MONTH");
+                  setPeriod("Month (September 2026)");
+                }}
+                className={`px-3 py-1.5 rounded-lg transition cursor-pointer ${
+                  activeViewMode === "MONTH"
+                    ? "bg-white text-railway-blue shadow-xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+              >
+                Month (30 Days)
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
       {/* 3. DYNAMIC SCHEDULE VIEW: WEEK VIEW VS MONTH VIEW */}
-      {activeViewMode === "WEEK" ? (
-        /* WEEKLY BLOCK TIMELINE */
+      {activeSectionTab === "schedule" && (
+        activeViewMode === "WEEK" ? (
+          /* WEEKLY BLOCK TIMELINE */
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
             <div>
@@ -523,20 +559,19 @@ export const DashboardPage: React.FC = () => {
                                     ? "bg-emerald-50 border-emerald-300 text-emerald-950"
                                     : "bg-blue-50/90 border-blue-200 text-blue-950"
                                 }`}
-                                title="Click for block details and rule explanation"
                               >
-                                <div className="flex items-center justify-between text-[9px] font-bold">
-                                  <span className="font-mono text-slate-700">{b.blockId}</span>
-                                  <span className="px-1 py-0.2 rounded text-[8px] uppercase font-black bg-blue-600 text-white">
-                                    {b.status}
+                                <div className="flex items-center justify-between">
+                                  <span className="font-mono font-bold text-[11px]">{b.blockId}</span>
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white/80 border border-slate-200">
+                                    {b.timeWindow}
                                   </span>
                                 </div>
-                                <div className="font-bold text-[10px] mt-0.5 truncate leading-tight" title={b.activity}>
+                                <div className="font-bold text-[11px] truncate mt-1 text-slate-900">
                                   {b.activity}
                                 </div>
-                                <div className="text-[9px] text-slate-600 flex items-center justify-between mt-1 pt-1 border-t border-blue-100 font-mono">
-                                  <span className="truncate">{b.section}</span>
-                                  <span className="font-bold text-slate-900">{b.timeWindow}</span>
+                                <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center justify-between">
+                                  <span>{b.section}</span>
+                                  <span className="font-bold">{b.durationHours}h</span>
                                 </div>
                               </button>
                             ))
@@ -549,48 +584,45 @@ export const DashboardPage: React.FC = () => {
               })}
             </div>
           </div>
-
-          <div className="pt-2 flex items-center justify-between text-xs text-slate-500">
-            <span className="italic text-[11px]">
-              * Click any scheduled block to inspect constraint factors, crew allocations, and timetable proofs.
-            </span>
-            <Link to="/optimizer" className="text-railway-blue hover:underline font-bold flex items-center space-x-1">
-              <span>View Hero Coordinated Block Optimizer</span>
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-          </div>
         </div>
       ) : (
-        /* MONTH VIEW (SEPTEMBER 2026 FULL OPERATIONAL CALENDAR) */
+        /* MONTHLY CALENDAR VIEW (30 DAYS) */
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
             <div>
               <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4 text-purple-600" />
+                <CalendarDays className="w-4 h-4 text-railway-blue" />
                 <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  Month View: September 2026 Full Corridor Schedule
+                  Monthly Block Overview (September 2026)
                 </h2>
                 <span className="bg-purple-50 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded font-mono border border-purple-200">
-                  30 Days
+                  Full Month Heatmap
                 </span>
               </div>
               <p className="text-[11px] text-slate-500 mt-0.5">
-                Monthly macro maintenance schedule across Indian Railways Mainline Corridor Alpha
+                Overview of possession density across the entire month. Click any date to inspect scheduled blocks.
               </p>
             </div>
 
-            <div className="flex items-center space-x-2 text-xs">
-              <span className="font-semibold text-slate-500">Selected Date:</span>
-              <span className="font-mono font-bold text-railway-blue bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
-                {selectedMonthDate}
+            {/* Density Legend */}
+            <div className="flex items-center space-x-2 text-[10px] font-bold text-slate-600">
+              <span>Density:</span>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-slate-50 border border-slate-200 text-slate-400">
+                0
+              </span>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-50 text-blue-700 border border-blue-200">
+                1-2
+              </span>
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded bg-blue-100 text-blue-900 font-bold border border-blue-300">
+                3+
               </span>
             </div>
           </div>
 
-          {/* 7-column Calendar Grid */}
+          {/* 30-Day Grid */}
           <div className="border border-slate-200 rounded-xl overflow-hidden">
-            {/* Days of Week Header */}
-            <div className="grid grid-cols-7 bg-slate-100 text-center font-bold text-slate-700 py-2.5 text-xs border-b border-slate-200">
+            {/* Days of week header */}
+            <div className="grid grid-cols-7 bg-slate-100/90 border-b border-slate-200 text-center text-[11px] font-black text-slate-600 py-2">
               <div>Mon</div>
               <div>Tue</div>
               <div>Wed</div>
@@ -600,11 +632,11 @@ export const DashboardPage: React.FC = () => {
               <div>Sun</div>
             </div>
 
-            {/* Day Cells */}
+            {/* 30 Day Cells */}
             <div className="grid grid-cols-7 divide-x divide-y divide-slate-100 text-xs">
               {monthCalendarDays.map((d, index) => {
                 if (d.isPadding) {
-                  return <div key={`pad-${index}`} className="bg-slate-50/50 min-h-[70px] p-2" />;
+                  return <div key={`pad-${index}`} className="bg-slate-50/50 min-h-[75px] p-2" />;
                 }
 
                 const isSelected = selectedMonthDate === d.dateStr;
@@ -612,9 +644,9 @@ export const DashboardPage: React.FC = () => {
 
                 return (
                   <button
-                    key={d.dateStr}
+                    key={d.dateStr || index}
                     onClick={() => d.dateStr && setSelectedMonthDate(d.dateStr)}
-                    className={`min-h-[76px] p-2 text-left flex flex-col justify-between transition cursor-pointer relative ${
+                    className={`min-h-[80px] p-2 text-left flex flex-col justify-between transition cursor-pointer relative ${
                       isSelected
                         ? "bg-blue-50/90 ring-2 ring-railway-blue ring-inset z-10"
                         : d.isPlanningWeek
@@ -693,236 +725,274 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
         </div>
-      )}
+      ))}
 
       {/* 4. MODERN CHARTS & INSIGHTS ROW (PIE CHART + BAR CHART + PLANNING INSIGHTS) */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
-        {/* Chart 1: Department Demand Pie / Donut Chart (4 cols) */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <PieIcon className="w-4 h-4 text-railway-blue" />
-                <h3 className="font-black text-xs uppercase tracking-wider text-slate-900">
-                  Department Demand Share
-                </h3>
-              </div>
-              <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                Pie Chart
-              </span>
-            </div>
-
-            <p className="text-[11px] text-slate-500 mt-2">
-              Proportion of maintenance block demands submitted across Engineering, S&T, and Traction:
-            </p>
-
-            {/* Recharts Pie / Donut Component */}
-            <div className="h-52 w-full mt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={departmentPieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={45}
-                    outerRadius={75}
-                    paddingAngle={3}
-                    dataKey="value"
-                  >
-                    {departmentPieData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip
-                    formatter={(value: any, name: any) => [`${value} tasks`, name]}
-                    contentStyle={{ backgroundColor: "#0F172A", borderRadius: "8px", color: "#fff", fontSize: "11px" }}
-                  />
-                  <Legend
-                    verticalAlign="bottom"
-                    iconType="circle"
-                    formatter={(val) => <span className="text-xs font-semibold text-slate-700">{val}</span>}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-            <span>Total Requests: <strong>{kpis.total_maintenance_requests}</strong></span>
-            <span className="text-railway-blue font-bold">100% Normalized</span>
-          </div>
-        </div>
-
-        {/* Chart 2: Priority Distribution Bar Chart (4 cols) */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <BarChart3 className="w-4 h-4 text-purple-600" />
-                <h3 className="font-black text-xs uppercase tracking-wider text-slate-900">
-                  Priority Distribution
-                </h3>
-              </div>
-              <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
-                Bar Chart
-              </span>
-            </div>
-
-            <p className="text-[11px] text-slate-500 mt-2">
-              Volume of active maintenance requests categorized by safety criticality level:
-            </p>
-
-            {/* Recharts Bar Chart Component */}
-            <div className="h-52 w-full mt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={priorityBarData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#475569" }} axisLine={{ stroke: "#CBD5E1" }} />
-                  <YAxis tick={{ fontSize: 11, fill: "#475569" }} axisLine={{ stroke: "#CBD5E1" }} allowDecimals={false} />
-                  <Tooltip
-                    formatter={(value: any) => [`${value} tasks`, "Demands"]}
-                    contentStyle={{ backgroundColor: "#0F172A", borderRadius: "8px", color: "#fff", fontSize: "11px" }}
-                  />
-                  <Bar dataKey="count" radius={[6, 6, 0, 0]}>
-                    {priorityBarData.map((entry, index) => (
-                      <Cell key={`bar-${index}`} fill={entry.fill} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
-            <span>Critical Coverage: <strong>{kpis.critical_task_coverage || 100}%</strong></span>
-            <span className="text-emerald-700 font-bold">Zero Backlog</span>
-          </div>
-        </div>
-
-        {/* Planning Insights Panel (4 cols) */}
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <div className="flex items-center space-x-2">
-                <Sparkles className="w-4 h-4 text-railway-blue" />
-                <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  Planning Insights
-                </h3>
-              </div>
-              <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md uppercase font-mono border border-slate-200">
-                CP-SAT
-              </span>
-            </div>
-
-            {/* Insights List */}
-            <div className="space-y-2.5 mt-3 text-xs">
-              {/* Insight 1 */}
-              <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 text-emerald-900 space-y-1">
-                <div className="flex items-center space-x-1.5 font-bold text-[11px]">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 flex-shrink-0" />
-                  <span>3 Compatible Requests Grouped</span>
+      {activeSectionTab === "analytics" && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          {/* Chart 1: Department Demand Pie / Donut Chart (4 cols) */}
+          <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center space-x-2">
+                  <PieIcon className="w-4 h-4 text-railway-blue" />
+                  <h3 className="font-black text-xs uppercase tracking-wider text-slate-900">
+                    Department Demand Share
+                  </h3>
                 </div>
-                <p className="text-[10px] text-emerald-800 leading-snug pl-5">
-                  Track renewal and signal maintenance bundled into single block BLK-101 in Section A-B.
-                </p>
+                <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                  Pie Chart
+                </span>
               </div>
 
-              {/* Insight 2 */}
-              <div className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/60 text-amber-900 space-y-1">
-                <div className="flex items-center space-x-1.5 font-bold text-[11px]">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
-                  <span>1 Resource Conflict Detected</span>
-                </div>
-                <p className="text-[10px] text-amber-800 leading-snug pl-5">
-                  Engineering Crew 1 demanded simultaneously on 18 Sep. Solver staggered secondary task to 20 Sep.
-                </p>
-              </div>
+              <p className="text-[11px] text-slate-500 mt-2">
+                Proportion of maintenance block demands submitted across Engineering, S&T, and Traction:
+              </p>
 
-              {/* Insight 3 */}
-              <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/60 text-blue-900 space-y-1">
-                <div className="flex items-center space-x-1.5 font-bold text-[11px]">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-railway-blue flex-shrink-0" />
-                  <span>2 Deadline-Critical Tasks Prioritized</span>
-                </div>
-                <p className="text-[10px] text-blue-800 leading-snug pl-5">
-                  Overdue tasks ENG-001 and SNT-002 scored 110.0 pts and granted highest priority.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-3 pt-2 border-t border-slate-100">
-            <Link
-              to="/conflicts"
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-xs"
-            >
-              <span>Review Conflict Matrix</span>
-              <ArrowRight className="w-3.5 h-3.5 text-slate-300" />
-            </Link>
-          </div>
-        </div>
-      </div>
-
-      {/* 5. Secondary Row: Critical Tasks Requiring Planner Attention */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
-        <div className="p-4 border-b border-slate-100 bg-slate-50/80 flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <AlertCircle className="w-4 h-4 text-rose-600" />
-            <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-              Critical Tasks Requiring Planner Attention ({summary.critical_tasks_requiring_attention.length})
-            </h3>
-          </div>
-          <Link to="/requests" className="text-[11px] font-bold text-railway-blue hover:underline">
-            View All Requisitions &rarr;
-          </Link>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-[10px] uppercase font-bold tracking-wider">
-                <th className="py-2.5 px-3">Task ID</th>
-                <th className="py-2.5 px-2">Dept</th>
-                <th className="py-2.5 px-2">Section</th>
-                <th className="py-2.5 px-3">Maintenance Activity</th>
-                <th className="py-2.5 px-2">Deadline</th>
-                <th className="py-2.5 px-2">Score</th>
-                <th className="py-2.5 px-2 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {summary.critical_tasks_requiring_attention.slice(0, 4).map((t) => (
-                <tr key={t.task_id} className="hover:bg-slate-50/80 transition">
-                  <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{t.task_id}</td>
-                  <td className="py-2.5 px-2">
-                    <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700">
-                      {t.department}
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-2 text-slate-600 font-mono text-[11px]">{t.location}</td>
-                  <td className="py-2.5 px-3 text-slate-800 max-w-xs truncate font-semibold" title={t.description}>
-                    {t.description}
-                  </td>
-                  <td className="py-2.5 px-2 font-mono text-slate-600 text-[11px]">{t.deadline}</td>
-                  <td className="py-2.5 px-2">
-                    <span className="font-mono font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-[11px]">
-                      {t.priority_score.toFixed(0)} pts
-                    </span>
-                  </td>
-                  <td className="py-2.5 px-2 text-right">
-                    <Link
-                      to={`/requests`}
-                      className="text-[11px] text-railway-blue hover:underline font-bold"
+              {/* Recharts Pie / Donut Component */}
+              <div className="h-52 w-full mt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={departmentPieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={45}
+                      outerRadius={75}
+                      paddingAngle={3}
+                      dataKey="value"
                     >
-                      Inspect &rarr;
-                    </Link>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      {departmentPieData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      formatter={(value: any, name: any) => [`${value} tasks`, name]}
+                      contentStyle={{ backgroundColor: "#0F172A", borderRadius: "8px", color: "#fff", fontSize: "11px" }}
+                    />
+                    <Legend
+                      verticalAlign="bottom"
+                      iconType="circle"
+                      formatter={(val) => <span className="text-xs font-semibold text-slate-700">{val}</span>}
+                    />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+              <span>Total Requests: <strong>{kpis.total_maintenance_requests}</strong></span>
+              <span className="text-railway-blue font-bold">100% Normalized</span>
+            </div>
+          </div>
+
+          {/* Chart 2: Priority Distribution Bar Chart (4 cols) */}
+          <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center space-x-2">
+                  <BarChart3 className="w-4 h-4 text-purple-600" />
+                  <h3 className="font-black text-xs uppercase tracking-wider text-slate-900">
+                    Priority Distribution
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                  Bar Chart
+                </span>
+              </div>
+
+              <p className="text-[11px] text-slate-500 mt-2">
+                Volume of active maintenance requests categorized by safety criticality level:
+              </p>
+
+              {/* Recharts Bar Chart Component */}
+              <div className="h-52 w-full mt-2">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={priorityBarData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: "#475569" }} axisLine={{ stroke: "#CBD5E1" }} />
+                    <YAxis tick={{ fontSize: 11, fill: "#475569" }} axisLine={{ stroke: "#CBD5E1" }} allowDecimals={false} />
+                    <Tooltip
+                      formatter={(value: any) => [`${value} tasks`, "Demands"]}
+                      contentStyle={{ backgroundColor: "#0F172A", borderRadius: "8px", color: "#fff", fontSize: "11px" }}
+                    />
+                    <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                      {priorityBarData.map((entry, index) => (
+                        <Cell key={`bar-${index}`} fill={entry.fill} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500 font-mono">
+              <span>Critical Coverage: <strong>{kpis.critical_task_coverage || 100}%</strong></span>
+              <span className="text-emerald-700 font-bold">Zero Backlog</span>
+            </div>
+          </div>
+
+          {/* Planning Insights Panel (4 cols) */}
+          <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 flex flex-col justify-between">
+            <div>
+              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                <div className="flex items-center space-x-2">
+                  <Sparkles className="w-4 h-4 text-railway-blue" />
+                  <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                    Planning Insights
+                  </h3>
+                </div>
+                <span className="text-[9px] font-bold bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md uppercase font-mono border border-slate-200">
+                  CP-SAT
+                </span>
+              </div>
+
+              {/* Insights List */}
+              <div className="space-y-2.5 mt-3 text-xs">
+                <div className="p-2.5 rounded-xl border border-emerald-200 bg-emerald-50/60 text-emerald-900 space-y-1">
+                  <div className="flex items-center space-x-1.5 font-bold text-[11px]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-700 flex-shrink-0" />
+                    <span>3 Compatible Requests Grouped</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-800 leading-snug pl-5">
+                    Track renewal and signal maintenance bundled into single block BLK-101 in Section A-B.
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-xl border border-amber-200 bg-amber-50/60 text-amber-900 space-y-1">
+                  <div className="flex items-center space-x-1.5 font-bold text-[11px]">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
+                    <span>1 Resource Conflict Detected</span>
+                  </div>
+                  <p className="text-[10px] text-amber-800 leading-snug pl-5">
+                    Engineering Crew 1 demanded simultaneously on 18 Sep. Solver staggered secondary task to 20 Sep.
+                  </p>
+                </div>
+
+                <div className="p-2.5 rounded-xl border border-blue-200 bg-blue-50/60 text-blue-900 space-y-1">
+                  <div className="flex items-center space-x-1.5 font-bold text-[11px]">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-railway-blue flex-shrink-0" />
+                    <span>2 Deadline-Critical Tasks Prioritized</span>
+                  </div>
+                  <p className="text-[10px] text-blue-800 leading-snug pl-5">
+                    Overdue tasks ENG-001 and SNT-002 scored 110.0 pts and granted highest priority.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-3 pt-2 border-t border-slate-100">
+              <Link
+                to="/conflicts"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-slate-900 hover:bg-black text-white text-xs font-bold transition shadow-xs"
+              >
+                <span>Review Conflict Matrix</span>
+                <ArrowRight className="w-3.5 h-3.5 text-slate-300" />
+              </Link>
+            </div>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* 5. Critical Tasks Requiring Planner Attention */}
+      {activeSectionTab === "tasks" && (
+        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-slate-100 bg-slate-50/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="w-4 h-4 text-rose-600" />
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                Critical Tasks Requiring Attention ({summary.critical_tasks_requiring_attention.length})
+              </h3>
+            </div>
+
+            {/* Live Filter Bar */}
+            <div className="flex items-center space-x-2">
+              <input
+                type="text"
+                placeholder="Filter by Task ID, Section, Activity..."
+                value={criticalTaskSearch}
+                onChange={(e) => setCriticalTaskSearch(e.target.value)}
+                className="px-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs focus:ring-2 focus:ring-railway-blue focus:outline-none w-64 shadow-2xs font-mono"
+              />
+              <Link
+                to="/requests"
+                className="px-3 py-1.5 bg-railway-blue hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition shadow-2xs whitespace-nowrap"
+              >
+                Open Requisitions BDMS &rarr;
+              </Link>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs border-collapse">
+              <thead>
+                <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 text-[10px] uppercase font-bold tracking-wider">
+                  <th className="py-2.5 px-3">Task ID</th>
+                  <th className="py-2.5 px-2">Dept</th>
+                  <th className="py-2.5 px-2">Section</th>
+                  <th className="py-2.5 px-3">Maintenance Activity</th>
+                  <th className="py-2.5 px-2">Deadline</th>
+                  <th className="py-2.5 px-2">Priority Score</th>
+                  <th className="py-2.5 px-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {summary.critical_tasks_requiring_attention
+                  .filter((t) => {
+                    if (!criticalTaskSearch) return true;
+                    const q = criticalTaskSearch.toLowerCase();
+                    return (
+                      t.task_id.toLowerCase().includes(q) ||
+                      t.department.toLowerCase().includes(q) ||
+                      t.location.toLowerCase().includes(q) ||
+                      t.description.toLowerCase().includes(q)
+                    );
+                  })
+                  .map((t) => (
+                    <tr key={t.task_id} className="hover:bg-slate-50/80 transition">
+                      <td className="py-2.5 px-3 font-mono font-bold text-slate-900">{t.task_id}</td>
+                      <td className="py-2.5 px-2">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                          t.department === "Engineering"
+                            ? "bg-blue-100 text-blue-800"
+                            : t.department === "S&T"
+                            ? "bg-purple-100 text-purple-800"
+                            : "bg-amber-100 text-amber-800"
+                        }`}>
+                          {t.department}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-2 text-slate-600 font-mono text-[11px]">{t.location}</td>
+                      <td className="py-2.5 px-3 text-slate-800 max-w-sm truncate font-semibold" title={t.description}>
+                        {t.description}
+                      </td>
+                      <td className="py-2.5 px-2 font-mono text-slate-600 text-[11px]">{t.deadline}</td>
+                      <td className="py-2.5 px-2">
+                        <span className="font-mono font-bold px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-200 text-[11px]">
+                          {t.priority_score.toFixed(0)} pts
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right space-x-2">
+                        <Link
+                          to={`/requests`}
+                          className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-lg text-[11px] font-bold inline-block"
+                        >
+                          Inspect
+                        </Link>
+                        <Link
+                          to={`/optimizer`}
+                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-railway-blue border border-blue-200 rounded-lg text-[11px] font-bold inline-block"
+                        >
+                          Optimize &rarr;
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Block Details Inspector Modal */}
       {selectedBlockItem && (
