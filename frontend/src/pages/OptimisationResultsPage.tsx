@@ -543,10 +543,17 @@ export const OptimisationResultsPage: React.FC = () => {
               </button>
               <button
                 onClick={() => {
+                  const taskId = selectedAssignment.task.task_id;
                   setSelectedAssignment(null);
-                  navigate("/explainability");
+                  navigate(`/explainability?taskId=${encodeURIComponent(taskId)}`, {
+                    state: {
+                      taskId,
+                      planId: activePlan?.plan_id,
+                      assignment: selectedAssignment
+                    }
+                  });
                 }}
-                className="px-4 py-2 bg-railway-blue hover:bg-blue-700 text-white rounded-lg text-xs font-bold"
+                className="px-4 py-2 bg-railway-blue hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition shadow-xs cursor-pointer"
               >
                 Open Full Explainability Matrix
               </button>
