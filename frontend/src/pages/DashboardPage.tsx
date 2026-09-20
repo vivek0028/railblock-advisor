@@ -41,13 +41,13 @@ import { DashboardSummary, SchedulePlan, ScheduleAssignment, BlockWindow } from 
 import { usePlanning } from "../context/PlanningContext";
 
 const DAYS_OF_WEEK = [
+  { key: "2026-09-18", name: "Friday", short: "Fri", dateStr: "18 Sep" },
+  { key: "2026-09-19", name: "Saturday", short: "Sat", dateStr: "19 Sep" },
+  { key: "2026-09-20", name: "Sunday", short: "Sun", dateStr: "20 Sep" },
   { key: "2026-09-21", name: "Monday", short: "Mon", dateStr: "21 Sep" },
   { key: "2026-09-22", name: "Tuesday", short: "Tue", dateStr: "22 Sep" },
   { key: "2026-09-23", name: "Wednesday", short: "Wed", dateStr: "23 Sep" },
   { key: "2026-09-24", name: "Thursday", short: "Thu", dateStr: "24 Sep" },
-  { key: "2026-09-18", name: "Friday", short: "Fri", dateStr: "18 Sep" },
-  { key: "2026-09-19", name: "Saturday", short: "Sat", dateStr: "19 Sep" },
-  { key: "2026-09-20", name: "Sunday", short: "Sun", dateStr: "20 Sep" },
 ];
 
 const DEPARTMENTS = ["Engineering", "S&T", "Traction"] as const;
@@ -608,8 +608,8 @@ export const DashboardPage: React.FC = () => {
                           className="p-1.5 border-r border-slate-200/80 flex flex-col gap-1.5 justify-center"
                         >
                           {blocks.length === 0 ? (
-                            <div className="h-full min-h-[60px] border border-dashed border-slate-200/90 rounded-lg flex items-center justify-center text-[10px] text-slate-400 font-medium">
-                              Idle
+                            <div className="h-full min-h-[60px] border border-dashed border-slate-200/90 rounded-lg flex flex-col items-center justify-center text-[10px] text-slate-400 font-medium p-1 text-center">
+                              <span>Clear for Traffic</span>
                             </div>
                           ) : (
                             blocks.map((b) => (
@@ -633,7 +633,18 @@ export const DashboardPage: React.FC = () => {
                                 </div>
                                 <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center justify-between">
                                   <span>{b.section}</span>
-                                  <span className="font-bold">{b.durationHours}h</span>
+                                  <div className="flex items-center space-x-1">
+                                    {b.bundledWith && b.bundledWith.length > 0 ? (
+                                      <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-purple-100 text-purple-800 border border-purple-200">
+                                        Joint ({b.bundledWith.length})
+                                      </span>
+                                    ) : (
+                                      <span className="text-[9px] font-medium px-1 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                        Solo
+                                      </span>
+                                    )}
+                                    <span className="font-bold">{b.durationHours}h</span>
+                                  </div>
                                 </div>
                               </button>
                             ))

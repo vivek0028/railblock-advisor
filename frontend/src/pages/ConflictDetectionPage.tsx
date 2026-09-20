@@ -19,11 +19,13 @@ import {
   ShieldAlert
 } from "lucide-react";
 import { api } from "../services/api";
-import { ConflictItem } from "../types";
+import { ConflictItem, MaintenanceTask, TrainMovement } from "../types";
 
 export const ConflictDetectionPage: React.FC = () => {
   const navigate = useNavigate();
   const [conflicts, setConflicts] = useState<ConflictItem[]>([]);
+  const [tasks, setTasks] = useState<MaintenanceTask[]>([]);
+  const [trains, setTrains] = useState<TrainMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDetecting, setIsDetecting] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string>("ALL");
@@ -38,8 +40,14 @@ export const ConflictDetectionPage: React.FC = () => {
   const loadConflicts = async () => {
     setLoading(true);
     try {
-      const data = await api.getConflicts();
-      setConflicts(data);
+      const [confData, tasksData, trainsData] = await Promise.all([
+        api.getConflicts(),
+        api.getTasks(),
+        api.getTrainMovements()
+      ]);
+      setConflicts(confData);
+      setTasks(tasksData);
+      setTrains(trainsData);
     } catch (err: any) {
       console.error("Failed to load conflicts:", err);
     } finally {
@@ -130,85 +138,102 @@ export const ConflictDetectionPage: React.FC = () => {
     });
   }, [conflicts, activeCategory, severityFilter]);
 
-  // Synthetic side-by-side activity parser for rich GovTech card view
+  // Dynamic side-by-side activity parser for rich GovTech card view
   const parseConflictEntities = (c: ConflictItem) => {
-    // Return structured side-A and side-B
-    if (c.conflict_type === "Location" || c.explanation.toLowerCase().includes("overlap")) {
+    const taskA = tasks.find((t) => t.task_id === c.affected_tasks?.[0]);
+    const taskB = tasks.find((t) => t.task_id === c.affected_tasks?.[1]);
+    const trainNo = c.affected_trains?.[0];
+    const trainObj = trains.find((tr) => tr.train_no === trainNo);
+
+    // Extract real section and windows from explanation text if available
+    const sectionMatch = c.explanation.match(/on\s*(Section\s+[A-Za-z0-9\-]+)/i);
+    const resolvedSection = sectionMatch ? sectionMatch[1] : (taskA?.location || "Corridor Track");
+
+    const blockWindowMatch = c.explanation.match(/\((\d{2}:\d{2}(?::\d{2})?\s*-\s*\d{2}:\d{2}(?::\d{2})?)\)/);
+    const blockTime = blockWindowMatch
+      ? blockWindowMatch[1].replace(/:00/g, "")
+      : (taskA ? `${taskA.duration_hours}h window` : "01:30 - 05:00");
+
+    const trainWindowMatch = c.explanation.match(/between\s*(\d{2}:\d{2})\s*and\s*(\d{2}:\d{2})/i);
+    const trainTime = trainWindowMatch
+      ? `${trainWindowMatch[1]} - ${trainWindowMatch[2]}`
+      : (trainObj ? `${trainObj.scheduled_departure.slice(11, 16)} - ${trainObj.scheduled_arrival.slice(11, 16)}` : "14:30 - 15:25");
+
+    if (c.conflict_type === "Timetable") {
       return {
         left: {
-          dept: "Engineering",
-          activity: "Track Inspection",
-          section: "Section A-B",
-          window: "10:00 - 12:00",
-          task: c.affected_tasks?.[0] || "REQ-001"
+          dept: taskA?.department ? `${taskA.department} Department` : "Maintenance Request",
+          activity: taskA?.description || "Scheduled Corridor Traffic Block",
+          section: resolvedSection,
+          window: blockTime,
+          task: taskA?.task_id || c.affected_tasks?.[0] || "MAINT-REQ"
         },
         right: {
-          dept: "S&T",
-          activity: "Signal Maintenance",
-          section: "Section A-B",
-          window: "11:00 - 13:00",
-          task: c.affected_tasks?.[1] || "REQ-002"
+          dept: "Passenger Operations",
+          activity: trainObj ? `${trainObj.train_name} (#${trainObj.train_no})` : `Express Train #${trainNo || '12004'}`,
+          section: trainObj?.section || resolvedSection,
+          window: trainTime,
+          task: `TRAIN-${trainNo || '12004'}`
         },
-        conflictLabel: "TIME + LOCATION CONFLICT",
-        reason: "Overlapping maintenance window & simultaneous Section A-B track occupancy.",
-        suggested: "Combine compatible activities into a single coordinated maintenance block (Joint Bundling)."
+        conflictLabel: "TIMETABLE TRAIN PATH CLASH",
+        reason: c.explanation,
+        suggested: c.suggested_resolution || "Reschedule block to nocturnal curfew window (01:30 - 05:00) or loop regulation."
       };
     } else if (c.conflict_type === "Resource") {
       return {
         left: {
-          dept: "Engineering",
-          activity: "Ballast Tamp & Screening",
-          section: "Section B-C",
-          window: "08:00 - 12:00",
-          task: c.affected_tasks?.[0] || "REQ-003"
+          dept: taskA?.department || "Engineering",
+          activity: taskA?.description || "Heavy Track Machinery Operation",
+          section: taskA?.location || resolvedSection,
+          window: `${taskA?.duration_hours || 3.0}h allocation`,
+          task: taskA?.task_id || c.affected_tasks?.[0] || "REQ-A"
         },
         right: {
-          dept: "Traction",
-          activity: "OHE Substation Overhaul",
-          section: "Section C-D",
-          window: "09:00 - 13:00",
-          task: c.affected_tasks?.[1] || "REQ-005"
+          dept: taskB?.department || "Traction",
+          activity: taskB?.description || "Corridor Gang Operations",
+          section: taskB?.location || resolvedSection,
+          window: `${taskB?.duration_hours || 2.5}h allocation`,
+          task: taskB?.task_id || c.affected_tasks?.[1] || "REQ-B"
         },
         conflictLabel: "RESOURCE BOTTLENECK",
         reason: c.explanation,
         suggested: c.suggested_resolution || "Stagger requisition times or reallocate auxiliary depot equipment."
       };
-    } else if (c.conflict_type === "Timetable") {
-      const train = c.affected_trains?.[0] || "12952";
+    } else if (c.conflict_type === "Location") {
       return {
         left: {
-          dept: "Maintenance Request",
-          activity: "OHE Line Disconnection",
-          section: "Section A-B",
-          window: "14:00 - 17:00",
-          task: c.affected_tasks?.[0] || "REQ-004"
+          dept: taskA?.department || "Engineering",
+          activity: taskA?.description || "Civil Track Rehabilitation",
+          section: taskA?.location || resolvedSection,
+          window: `${taskA?.duration_hours || 3.5}h block`,
+          task: taskA?.task_id || c.affected_tasks?.[0] || "REQ-001"
         },
         right: {
-          dept: "Passenger Operations",
-          activity: `Express Train #${train}`,
-          section: "Section A-B",
-          window: "14:45 - 15:30",
-          task: `TRAIN-${train}`
+          dept: taskB?.department || "S&T",
+          activity: taskB?.description || "Interlocking & Point Maintenance",
+          section: taskB?.location || resolvedSection,
+          window: `${taskB?.duration_hours || 2.0}h block`,
+          task: taskB?.task_id || c.affected_tasks?.[1] || "REQ-002"
         },
-        conflictLabel: "TIMETABLE TRAIN PATH CLASH",
+        conflictLabel: "TIME + LOCATION TRACK CONFLICT",
         reason: c.explanation,
-        suggested: c.suggested_resolution || "Reschedule block to nocturnal window (01:00 - 04:30) or loop regulation."
+        suggested: c.suggested_resolution || "Combine compatible activities into a single coordinated maintenance block."
       };
     } else {
       return {
         left: {
-          dept: "Engineering",
-          activity: "Precedent Track Alignment",
-          section: "Section B-C",
-          window: "09:00 - 11:00",
-          task: c.affected_tasks?.[0] || "REQ-001"
+          dept: taskA?.department || "Engineering",
+          activity: taskA?.description || "Precedent Track Alignment",
+          section: taskA?.location || resolvedSection,
+          window: `${taskA?.duration_hours || 2.0}h window`,
+          task: taskA?.task_id || c.affected_tasks?.[0] || "REQ-001"
         },
         right: {
-          dept: "S&T",
-          activity: "Point Machine Calibration",
-          section: "Section B-C",
-          window: "08:30 - 10:30",
-          task: c.affected_tasks?.[1] || "REQ-002"
+          dept: taskB?.department || "S&T",
+          activity: taskB?.description || "Dependent Inspection",
+          section: taskB?.location || resolvedSection,
+          window: `${taskB?.duration_hours || 2.0}h window`,
+          task: taskB?.task_id || c.affected_tasks?.[1] || "REQ-002"
         },
         conflictLabel: "DEPENDENCY & PRECEDENCE CONFLICT",
         reason: c.explanation,

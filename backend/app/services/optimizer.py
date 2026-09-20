@@ -146,6 +146,26 @@ class RailBlockOptimizer:
                         )
 
         # -------------------------------------------------------------
+        # HARD CONSTRAINT 5b: Simultaneous Cross-Departmental Compatibility
+        # -------------------------------------------------------------
+        # When bundling is enabled, tasks from different departments can only
+        # share the same block window if BOTH tasks explicitly declare each
+        # other's department as mutually compatible.
+        # Incompatible tasks (e.g. Solo Traction OHE or Solo Bridge girder inspection)
+        # can NEVER be scheduled simultaneously in the same block window.
+        if allow_bundling:
+            for b in blocks:
+                for i in range(len(tasks)):
+                    for j in range(i + 1, len(tasks)):
+                        t1 = tasks[i]
+                        t2 = tasks[j]
+                        if t1.department != t2.department:
+                            c1 = set(t1.compatible_departments or [t1.department])
+                            c2 = set(t2.compatible_departments or [t2.department])
+                            if t2.department not in c1 or t1.department not in c2:
+                                model.Add(x[(t1.task_id, b.block_id)] + x[(t2.task_id, b.block_id)] <= 1)
+
+        # -------------------------------------------------------------
         # HARD CONSTRAINT 6: Resource Availability & Double Booking
         # -------------------------------------------------------------
         # 6a. If resource is marked unavailable, task CANNOT be scheduled
