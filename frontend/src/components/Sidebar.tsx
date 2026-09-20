@@ -80,10 +80,9 @@ export const Sidebar: React.FC = () => {
               <Train className="w-4 h-4 text-white" />
             </div>
             <div>
-              <div className="text-xs font-black tracking-wider text-slate-900 uppercase">
-                Decision Pipeline
+              <div className="text-sm font-black tracking-wider text-slate-900">
+                RAILOPTIBLOCK
               </div>
-              <p className="text-[10px] text-slate-500 font-medium">RailOptiBlock Operations System</p>
             </div>
           </div>
           <button
