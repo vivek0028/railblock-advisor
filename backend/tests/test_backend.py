@@ -416,6 +416,97 @@ def test_goods_forecast_and_multi_horizon():
     assert monthly_plan["asset_availability_pct"] >= 90.0
     assert "goods_train_regulations" in monthly_plan
 
+def test_conflict_resolution_and_reopen():
+    # 1. Get initial active conflicts
+    res_conf = client.get("/api/conflicts?status=Active")
+    assert res_conf.status_code == 200
+    active_conflicts = res_conf.json()
+    assert len(active_conflicts) > 0
+
+    target_id = active_conflicts[0]["conflict_id"]
+    initial_active_count = len(active_conflicts)
+
+    # 2. Resolve target conflict
+    resolve_payload = {
+        "resolution_strategy": "PLAN-A-CRIT (Maximum Critical Coverage)",
+        "applied_plan_id": "PLAN-A-CRIT",
+        "resolution_notes": "Resolved by rescheduling block post-train passage."
+    }
+    res_resolve = client.patch(f"/api/conflicts/{target_id}/resolve", json=resolve_payload)
+    assert res_resolve.status_code == 200
+    resolve_data = res_resolve.json()
+    assert resolve_data["status"] == "success"
+    assert resolve_data["new_status"] == "Resolved"
+    assert resolve_data["resolution_strategy"] == resolve_payload["resolution_strategy"]
+
+    # 3. Verify Active conflicts decreased by 1
+    res_active_after = client.get("/api/conflicts?status=Active")
+    assert len(res_active_after.json()) == initial_active_count - 1
+
+    # 4. Verify Resolved conflicts contains target
+    res_resolved = client.get("/api/conflicts?status=Resolved")
+    assert any(c["conflict_id"] == target_id for c in res_resolved.json())
+
+    # 5. Verify Dashboard reflects active vs resolved conflicts
+    res_dash = client.get("/api/dashboard/summary")
+    assert res_dash.status_code == 200
+    kpis = res_dash.json()["kpis"]
+    assert kpis["conflicts_detected"] == initial_active_count - 1
+    assert kpis.get("resolved_conflicts", 0) >= 1
+
+    # 6. Reopen target conflict
+    res_reopen = client.patch(f"/api/conflicts/{target_id}/reopen")
+    assert res_reopen.status_code == 200
+    reopened_data = res_reopen.json()
+    assert reopened_data["new_status"] == "Active"
+
+    # 7. Verify Active conflicts count restored
+    res_restored = client.get("/api/conflicts?status=Active")
+    assert len(res_restored.json()) == initial_active_count
+
+def test_approved_plan_timetable_schedule_sync():
+    # 1. Approve Plan C (PLAN-C-BUNDLE)
+    appr_payload = {
+        "user_name": "Chief Controller Sharma",
+        "user_role": "Reviewer",
+        "comments": "Multi-department corridor block approved for execution."
+    }
+    res = client.post("/api/plans/PLAN-C-BUNDLE/approve", json=appr_payload)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["status"] == "success"
+    assert data["new_status"] == "Approved"
+
+    # 2. Verify list_optimization_plans returns Approved plan first
+    res_plans = client.get("/api/optimization/plans")
+    assert res_plans.status_code == 200
+    plans = res_plans.json()
+    assert plans[0]["plan_id"] == "PLAN-C-BUNDLE"
+    assert plans[0]["status"] == "Approved"
+
+    # 3. Verify Maintenance Tasks have been committed to 'Approved' with assigned block IDs
+    res_tasks = client.get("/api/tasks?status=Approved")
+    assert res_tasks.status_code == 200
+    approved_tasks = res_tasks.json()
+    assert len(approved_tasks) > 0
+    for t in approved_tasks:
+        assert t["status"] == "Approved"
+        assert t["assigned_block_id"] is not None
+
+    # 4. Verify Block Windows status updated to Approved
+    res_blocks = client.get("/api/block-windows?status=Approved")
+    assert res_blocks.status_code == 200
+    approved_blocks = res_blocks.json()
+    assert len(approved_blocks) > 0
+
+    # 5. Verify Dashboard summary reflects the approved plan as master schedule
+    res_dash = client.get("/api/dashboard/summary")
+    assert res_dash.status_code == 200
+    dash_data = res_dash.json()
+    assert dash_data["kpis"]["scheduled_tasks"] == plans[0]["scheduled_count"]
+
+
+
 
 
 

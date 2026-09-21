@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import {
   Cpu,
   RefreshCw,
@@ -16,15 +16,237 @@ import {
   Sparkles,
   SlidersHorizontal,
   ChevronRight,
-  ExternalLink
+  ExternalLink,
+  ArrowLeft,
+  Check,
+  Zap,
+  ShieldAlert,
+  AlertCircle
 } from "lucide-react";
 import { api } from "../services/api";
-import { SchedulePlan, ScheduleAssignment, DeferredTaskItem } from "../types";
+import { SchedulePlan, ScheduleAssignment, DeferredTaskItem, ConflictItem, MaintenanceTask, TrainMovement } from "../types";
 import { DepartmentBadge, PriorityBadge, StatusBadge } from "../components/Badges";
 import { usePlanning } from "../context/PlanningContext";
 
+interface PlanResolutionDetails {
+  planLabel: string;
+  whatChanges: string;
+  movedItem: string;
+  newTimingOrResource: string;
+  compatibility?: string;
+  conflictStatus: {
+    label: string;
+    badgeClass: string;
+    icon: string;
+  };
+  impactTradeOff: string;
+  expectedResult: string;
+  actionButtonText: string;
+}
+
+const getPlanConflictAnalysis = (
+  plan: SchedulePlan,
+  conflict: ConflictItem | null
+): PlanResolutionDetails => {
+  const planId = (plan.plan_id || "").toUpperCase();
+  const strat = (plan.strategy_type || "").toUpperCase();
+  const isPlanA = planId.startsWith("PLAN-A") || strat.includes("PLAN_A");
+  const isPlanB = planId.startsWith("PLAN-B") || strat.includes("PLAN_B");
+
+  if (!conflict) {
+    return {
+      planLabel: isPlanA
+        ? "Plan A — Maximum Critical Coverage"
+        : isPlanB
+        ? "Plan B — Minimum Train Impact"
+        : "Plan C — Maximum Task Bundling",
+      whatChanges: plan.notes || "Optimized baseline corridor schedule.",
+      movedItem: "Standard optimization across all corridor sections.",
+      newTimingOrResource: "As scheduled in optimization matrix.",
+      conflictStatus: {
+        label: "Conflict resolved",
+        badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+        icon: "🟢",
+      },
+      impactTradeOff: "Balancing asset uptime vs passenger train timetable constraints.",
+      expectedResult: `${plan.scheduled_count} tasks scheduled with ${plan.asset_availability_pct || 96.8}% uptime.`,
+      actionButtonText: `Apply ${plan.plan_name}`,
+    };
+  }
+
+  const cType = (conflict.conflict_type || "").toLowerCase();
+  const tasksStr = conflict.affected_tasks.length > 0 ? conflict.affected_tasks.join(", ") : "Maintenance Request";
+  const trainsStr = conflict.affected_trains.length > 0 ? `Train ${conflict.affected_trains.join(", ")}` : "Operational Movements";
+
+  // Case 1: Timetable Clash (Train vs Maintenance Block)
+  if (cType.includes("timetable") || cType.includes("train") || conflict.affected_trains.length > 0) {
+    if (isPlanA) {
+      return {
+        planLabel: "Plan A — Reschedule Request (Critical Priority)",
+        whatChanges: "Adjusts maintenance start window to commence immediately after train clear path.",
+        movedItem: `Block for ${tasksStr} adjusted from peak slot to clear train window.`,
+        newTimingOrResource: "15:30 – 18:30 (Daytime Block Post-Train Clearance)",
+        compatibility: "100% compatible with corridor track capacity after train clearance.",
+        conflictStatus: {
+          label: "Conflict resolved",
+          badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          icon: "🟢",
+        },
+        impactTradeOff: "Possession window compressed by 30 mins; requires focused rapid execution gang.",
+        expectedResult: `${trainsStr} runs strictly on-time (0 min delay); urgent safety maintenance completed.`,
+        actionButtonText: "Apply Plan A & Resolve Conflict",
+      };
+    } else if (isPlanB) {
+      return {
+        planLabel: "Plan B — Shift to Night Curfew (Zero Train Clash)",
+        whatChanges: "Reallocates maintenance corridor possession into designated zero-traffic night curfew.",
+        movedItem: `Entire maintenance block (${tasksStr}) shifted away from daytime traffic.`,
+        newTimingOrResource: "01:30 – 05:00 (Corridor Night Curfew Window)",
+        compatibility: "Compatible with OHE 25kV power cut schedule & zero revenue traffic.",
+        conflictStatus: {
+          label: "Conflict resolved",
+          badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          icon: "🟢",
+        },
+        impactTradeOff: "Requires night illumination gear, cold-weather/night safety briefing, and night gang allowance.",
+        expectedResult: "Zero passenger or freight train disruption; gives unconstrained 3.5 hrs continuous block.",
+        actionButtonText: "Apply Plan B & Resolve Conflict",
+      };
+    } else {
+      // Plan C
+      return {
+        planLabel: "Plan C — Adjust Schedule & Multi-Dept Bundling",
+        whatChanges: "Combines Engineering, S&T, and Traction into single pre-train morning possession.",
+        movedItem: `${tasksStr} bundled together into synchronized block (09:00–12:00); freight rakes regulated at sidings.`,
+        newTimingOrResource: "09:00 – 12:00 (Synchronized Bundled Window)",
+        compatibility: "Multi-departmental cross-locking verified in TMS & SMMS.",
+        conflictStatus: {
+          label: "Conflict resolved",
+          badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          icon: "🟢",
+        },
+        impactTradeOff: "Requires joint departmental coordination between Section Engineers (P-Way, Signals, OHE).",
+        expectedResult: "3 departments complete maintenance in 1 possession; corridor clears 2.5 hours before train arrives.",
+        actionButtonText: "Apply Plan C & Resolve Conflict",
+      };
+    }
+  }
+
+  // Case 2: Resource Contention (Crews, USFD Machines, Heavy Machinery)
+  if (cType.includes("resource")) {
+    const resourceName = conflict.explanation.includes("'")
+      ? conflict.explanation.split("'")[1]
+      : "Assigned Machinery / Crew";
+    const primaryTask = conflict.affected_tasks[0] || "Request 1";
+    const secondaryTask = conflict.affected_tasks[1] || "Request 2";
+
+    if (isPlanA) {
+      return {
+        planLabel: "Plan A — Reschedule Lower Priority Request",
+        whatChanges: `Retains ${resourceName} for priority task ${primaryTask}; shifts ${secondaryTask} to alternate shift.`,
+        movedItem: `Task ${secondaryTask} moved to Shift 2 (Staggered Execution).`,
+        newTimingOrResource: "Shift 2: 15:00 – 18:30 (Sequential Utilization)",
+        compatibility: "Full tool & machinery compatibility confirmed.",
+        conflictStatus: {
+          label: "Conflict resolved",
+          badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          icon: "🟢",
+        },
+        impactTradeOff: `Secondary task ${secondaryTask} delayed by ~4.5 hours on the same maintenance day.`,
+        expectedResult: "Eliminates resource overlap; critical task completed with dedicated crew focus.",
+        actionButtonText: "Apply Plan A & Resolve Conflict",
+      };
+    } else if (isPlanB) {
+      return {
+        planLabel: "Plan B — Reassign Resource (Standby Depot Gang)",
+        whatChanges: `Reassigns ${secondaryTask} to secondary backup crew/equipment without moving schedule.`,
+        movedItem: `Resource for ${secondaryTask} swapped from ${resourceName} to Standby Gang.`,
+        newTimingOrResource: `Standby Depot Gang 2 / Regional Machinery Unit`,
+        compatibility: "Same competency & safety certification level (100% compatible).",
+        conflictStatus: {
+          label: "Conflict resolved",
+          badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          icon: "🟢",
+        },
+        impactTradeOff: "Requires standby gang mobilization and inter-depot equipment transit (4.2 km).",
+        expectedResult: "Both maintenance tasks proceed concurrently in their original requested slot.",
+        actionButtonText: "Apply Plan B & Resolve Conflict",
+      };
+    } else {
+      // Plan C
+      return {
+        planLabel: "Plan C — Adjust Schedule (Joint Resource Sharing)",
+        whatChanges: `Combines ${primaryTask} and ${secondaryTask} into a unified corridor block with shared machinery.`,
+        movedItem: `Both requests synchronized into a unified work session with phased resource handover.`,
+        newTimingOrResource: "10:00 – 14:00 (Unified Joint Possession)",
+        compatibility: "Joint possession verified for track protection rules.",
+        conflictStatus: {
+          label: "Conflict resolved",
+          badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+          icon: "🟢",
+        },
+        impactTradeOff: "Requires unified supervisory oversight by sectional Assistant Divisional Engineer.",
+        expectedResult: "Single corridor possession saves 1.5 hours of track blocking time while fulfilling both requests.",
+        actionButtonText: "Apply Plan C & Resolve Conflict",
+      };
+    }
+  }
+
+  // Case 3: Duration / Operational / Section Occupancy
+  if (isPlanA) {
+    return {
+      planLabel: "Plan A — Reschedule Request (Extended Window)",
+      whatChanges: "Shifts task to low-density schedule window capable of accommodating full duration.",
+      movedItem: `Task ${tasksStr} rescheduled to weekend/night low-density timetable path.`,
+      newTimingOrResource: "Upcoming Low-Density Window (01:00 – 05:00)",
+      compatibility: "Fully conforms with sectional track speed & safety regulations.",
+      conflictStatus: {
+        label: "Conflict resolved",
+        badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+        icon: "🟢",
+      },
+      impactTradeOff: "Execution scheduled into designated weekend/night maintenance window.",
+      expectedResult: "Full required duration provided without truncating maintenance safety procedures.",
+      actionButtonText: "Apply Plan A & Resolve Conflict",
+    };
+  } else if (isPlanB) {
+    return {
+      planLabel: "Plan B — Phased Sub-Blocks (Modular Disconnection)",
+      whatChanges: "Splits excessive duration into two staged sub-blocks across consecutive days.",
+      movedItem: `Task ${tasksStr} divided into Phase 1 (2.0h) and Phase 2 (2.0h).`,
+      newTimingOrResource: "Phase 1: Day 1 (13:00–15:00), Phase 2: Day 2 (13:00–15:00)",
+      compatibility: "Track clampable between phases to permit regular train speed.",
+      conflictStatus: {
+        label: "Conflict resolved",
+        badgeClass: "bg-emerald-100 text-emerald-800 border-emerald-300",
+        icon: "🟢",
+      },
+      impactTradeOff: "Requires interim track restoration & caution order between Phase 1 and 2.",
+      expectedResult: "Avoids long continuous line possession while safely completing rehabilitation.",
+      actionButtonText: "Apply Plan B & Resolve Conflict",
+    };
+  } else {
+    return {
+      planLabel: "Plan C — Special Traffic Block with Route Diversion",
+      whatChanges: "Secures dedicated Special Corridor Block with freight train regulation.",
+      movedItem: `Full possession approved; freight trains regulated at sidings during work.`,
+      newTimingOrResource: "11:30 – 15:30 (Special Traffic Possession)",
+      compatibility: "Regulated via FOIS freight loop sidings.",
+      conflictStatus: {
+        label: "Partial resolution",
+        badgeClass: "bg-amber-100 text-amber-800 border-amber-300",
+        icon: "🟡",
+      },
+      impactTradeOff: "Freight train encounters ~20-30 mins dwell in loop siding.",
+      expectedResult: "Task completed in one single continuous possession with zero passenger impact.",
+      actionButtonText: "Apply Plan C & Resolve Conflict",
+    };
+  }
+};
+
 export const OptimisationResultsPage: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const { period, setPeriod, corridor, setCorridor } = usePlanning();
 
@@ -35,6 +257,13 @@ export const OptimisationResultsPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [actionNotice, setActionNotice] = useState<string | null>(null);
+
+  // Selected conflict context from Conflict Detection page
+  const conflictIdParam = searchParams.get("conflictId") || (location.state as any)?.conflictId;
+  const [focusedConflict, setFocusedConflict] = useState<ConflictItem | null>(null);
+  const [tasks, setTasks] = useState<MaintenanceTask[]>([]);
+  const [trains, setTrains] = useState<TrainMovement[]>([]);
+  const [isResolving, setIsResolving] = useState(false);
 
   // Selected assignment for Explainability Modal
   const [selectedAssignment, setSelectedAssignment] = useState<ScheduleAssignment | null>(null);
@@ -64,14 +293,88 @@ export const OptimisationResultsPage: React.FC = () => {
     }
   };
 
+  const loadConflictContext = async (targetConfId: string) => {
+    try {
+      const [confData, tasksData, trainsData] = await Promise.all([
+        api.getConflicts(),
+        api.getTasks(),
+        api.getTrainMovements()
+      ]);
+      setTasks(tasksData);
+      setTrains(trainsData);
+      const matched = confData.find((c: ConflictItem) => c.conflict_id === targetConfId);
+      if (matched) {
+        setFocusedConflict(matched);
+      }
+    } catch (err: any) {
+      console.error("Error loading conflict context:", err);
+    }
+  };
+
   useEffect(() => {
     loadPlans();
   }, []);
 
+  useEffect(() => {
+    if (conflictIdParam) {
+      loadConflictContext(conflictIdParam);
+    }
+  }, [conflictIdParam]);
+
   const handleSelectPlan = (planId: string) => {
     setActivePlanId(planId);
-    setSearchParams({ plan: planId });
+    const newParams: Record<string, string> = { plan: planId };
+    if (conflictIdParam) newParams.conflictId = conflictIdParam;
+    setSearchParams(newParams);
     loadPlanDetail(planId);
+  };
+
+  const handleApplyPlanForConflict = async (plan: SchedulePlan) => {
+    if (!focusedConflict) return;
+    setIsResolving(true);
+    try {
+      const strategyLabel = `${plan.plan_id} (${plan.plan_name})`;
+      await api.resolveConflict(focusedConflict.conflict_id, {
+        resolution_strategy: strategyLabel,
+        applied_plan_id: plan.plan_id,
+        resolution_notes: `Resolved via ${plan.plan_name} (${plan.strategy_type}). Schedule updated.`
+      });
+
+      handleSelectPlan(plan.plan_id);
+
+      setFocusedConflict({
+        ...focusedConflict,
+        status: "Resolved",
+        resolution_strategy: strategyLabel,
+        resolved_at: new Date().toISOString(),
+        resolution_notes: `Resolved via ${plan.plan_name}`
+      });
+
+      setActionNotice(`✅ Conflict ${focusedConflict.conflict_id} successfully resolved! ${plan.plan_name} applied to corridor.`);
+      setTimeout(() => setActionNotice(null), 8000);
+    } catch (err: any) {
+      alert(`Failed to apply plan: ${err.message}`);
+    } finally {
+      setIsResolving(false);
+    }
+  };
+
+  const handleReopenConflictFromOptimizer = async (conflictId: string) => {
+    try {
+      await api.reopenConflict(conflictId);
+      if (focusedConflict) {
+        setFocusedConflict({
+          ...focusedConflict,
+          status: "Active",
+          resolution_strategy: null,
+          resolved_at: null
+        });
+      }
+      setActionNotice(`Conflict ${conflictId} reopened to Active queue.`);
+      setTimeout(() => setActionNotice(null), 5000);
+    } catch (err: any) {
+      alert(`Failed to reopen conflict: ${err.message}`);
+    }
   };
 
   const handleGeneratePlans = async () => {
@@ -164,6 +467,153 @@ export const OptimisationResultsPage: React.FC = () => {
         </div>
       )}
 
+      {/* RESOLVING CONFLICT CONTEXT BANNER */}
+      {focusedConflict && (
+        <div
+          className={`rounded-xl border p-4 sm:p-5 shadow-xs transition ${
+            focusedConflict.status === "Resolved"
+              ? "bg-emerald-50/80 border-emerald-300"
+              : "bg-amber-50/80 border-amber-300"
+          }`}
+        >
+          <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+            <div className="space-y-2 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="bg-slate-900 text-white font-mono font-black text-xs px-2.5 py-1 rounded shadow-2xs">
+                  Resolving Conflict: {focusedConflict.conflict_id}
+                </span>
+                <span
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded border uppercase ${
+                    focusedConflict.conflict_type === "Timetable"
+                      ? "bg-amber-100 text-amber-900 border-amber-300"
+                      : focusedConflict.conflict_type === "Resource"
+                      ? "bg-blue-100 text-blue-900 border-blue-300"
+                      : "bg-purple-100 text-purple-900 border-purple-300"
+                  }`}
+                >
+                  {focusedConflict.conflict_type} Conflict
+                </span>
+                <span
+                  className={`text-[11px] font-bold px-2 py-0.5 rounded border ${
+                    focusedConflict.severity === "Critical"
+                      ? "bg-red-100 text-red-800 border-red-300"
+                      : "bg-amber-100 text-amber-800 border-amber-300"
+                  }`}
+                >
+                  {focusedConflict.severity} Severity
+                </span>
+                {focusedConflict.status === "Resolved" ? (
+                  <span className="bg-emerald-600 text-white font-mono font-bold text-xs px-2.5 py-0.5 rounded flex items-center space-x-1 shadow-2xs">
+                    <Check className="w-3.5 h-3.5" />
+                    <span>RESOLVED</span>
+                  </span>
+                ) : (
+                  <span className="bg-red-600 text-white font-mono font-bold text-xs px-2.5 py-0.5 rounded animate-pulse">
+                    OPEN CONFLICT
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-slate-900">
+                  {focusedConflict.conflict_type} Conflict between{" "}
+                  <span className="text-railway-blue font-mono font-bold">
+                    Request {focusedConflict.affected_tasks.join(", ") || "N/A"}
+                  </span>
+                  {focusedConflict.affected_trains.length > 0 && (
+                    <>
+                      {" "}and{" "}
+                      <span className="text-amber-800 font-mono font-bold">
+                        Train {focusedConflict.affected_trains.join(", ")}
+                      </span>
+                    </>
+                  )}
+                </h3>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-700 mt-1">
+                  <div className="flex items-center space-x-1">
+                    <Clock className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="font-semibold">Time Window:</span>
+                    <span className="font-mono font-bold text-slate-900">
+                      {focusedConflict.explanation.match(/\d{2}:\d{2}(:\d{2})?\s*-\s*\d{2}:\d{2}(:\d{2})?/)?.[0] || "12:00 – 15:30"}
+                    </span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <SlidersHorizontal className="w-3.5 h-3.5 text-slate-500" />
+                    <span className="font-semibold">Corridor:</span>
+                    <span className="font-bold text-slate-900">
+                      {focusedConflict.explanation.match(/Section\s+[A-Za-z\-]+/)?.[0] || corridor}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white/90 rounded-lg p-3 border border-slate-200 text-xs space-y-1.5">
+                <div className="flex items-start space-x-2">
+                  <AlertCircle className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <strong className="text-slate-900 font-bold">Current Issue: </strong>
+                    <span className="text-slate-800 leading-relaxed">{focusedConflict.explanation}</span>
+                  </div>
+                </div>
+                {focusedConflict.suggested_resolution && (
+                  <div className="flex items-start space-x-2 pt-1.5 border-t border-slate-100">
+                    <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <strong className="text-emerald-900 font-bold">Recommended Resolution: </strong>
+                      <span className="text-slate-700 leading-relaxed">{focusedConflict.suggested_resolution}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {focusedConflict.status === "Resolved" && (
+                <div className="bg-emerald-100/90 border border-emerald-300 rounded-lg p-2.5 text-xs text-emerald-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700 flex-shrink-0" />
+                    <span>
+                      <strong>Resolved via:</strong> {focusedConflict.resolution_strategy || "Applied Optimization Plan"}
+                      {focusedConflict.resolved_at && ` on ${new Date(focusedConflict.resolved_at).toLocaleTimeString()}`}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleReopenConflictFromOptimizer(focusedConflict.conflict_id)}
+                    className="inline-flex items-center space-x-1 px-2.5 py-1 rounded bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 text-[11px] font-bold transition cursor-pointer whitespace-nowrap self-start sm:self-auto"
+                  >
+                    <RotateCcw className="w-3 h-3" />
+                    <span>Reopen Conflict</span>
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-row md:flex-col gap-2 flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => navigate("/conflicts")}
+                className="inline-flex items-center justify-center space-x-1.5 px-3 py-2 rounded-lg bg-white border border-slate-300 hover:bg-slate-50 text-xs font-bold text-slate-700 transition cursor-pointer shadow-2xs"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Back to Conflicts</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFocusedConflict(null);
+                  const newParams = new URLSearchParams(searchParams);
+                  newParams.delete("conflictId");
+                  setSearchParams(newParams);
+                }}
+                className="inline-flex items-center justify-center space-x-1 px-3 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 text-xs font-semibold transition cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+                <span>Clear Focus</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Top Controls: Planning Period, Corridor / Section, Generate Plan, Reset */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-xs flex flex-wrap items-center justify-between gap-4">
         <div className="flex flex-wrap items-center gap-3 text-xs">
@@ -245,53 +695,173 @@ export const OptimisationResultsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Plan Strategy Selection Tabs */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+      {/* Plan Strategy Selection Tabs / Detailed Conflict Resolution Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {plans.map((p) => {
           const isSelected = p.plan_id === activePlanId;
+          const analysis = getPlanConflictAnalysis(p, focusedConflict);
+          const isAppliedForThisConflict =
+            focusedConflict?.status === "Resolved" &&
+            (focusedConflict.resolution_strategy?.includes(p.plan_id) ||
+              (p.status === "Approved" && focusedConflict.resolution_strategy?.includes("Plan")));
+
           return (
-            <button
+            <div
               key={p.plan_id}
               onClick={() => handleSelectPlan(p.plan_id)}
-              className={`p-4 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between ${
+              className={`p-4.5 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer ${
                 isSelected
-                  ? "bg-white border-railway-blue ring-2 ring-blue-500/20 shadow-sm"
-                  : "bg-white border-slate-200 hover:border-slate-300"
+                  ? "bg-white border-railway-blue ring-2 ring-blue-500/20 shadow-md"
+                  : "bg-white border-slate-200 hover:border-slate-300 shadow-xs"
               }`}
             >
-              <div>
-                <div className="flex items-center justify-between">
+              <div className="space-y-3">
+                {/* Plan Header */}
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center space-x-1.5">
-                    <span className="font-mono text-xs font-black text-slate-500">{p.plan_id}</span>
-                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 uppercase">
+                    <span className="font-mono text-xs font-black text-slate-700 bg-slate-100 px-2 py-0.5 rounded">
+                      {p.plan_id}
+                    </span>
+                    <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-blue-50 text-railway-blue uppercase">
                       {p.horizon || horizon}
                     </span>
                   </div>
-                  <StatusBadge status={p.status} />
+                  <div className="flex items-center space-x-1.5">
+                    {isAppliedForThisConflict && (
+                      <span className="bg-emerald-600 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase">
+                        ✓ Applied
+                      </span>
+                    )}
+                    <StatusBadge status={p.status} />
+                  </div>
                 </div>
-                <h3 className="text-sm font-black text-slate-900 mt-1">{p.plan_name}</h3>
-                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{p.notes}</p>
+
+                {/* Plan Title & Subtitle */}
+                <div>
+                  <h3 className="text-sm font-black text-slate-900 leading-snug">
+                    {analysis.planLabel}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                    {p.notes}
+                  </p>
+                </div>
+
+                {/* Conflict Status Badge */}
+                <div className="pt-0.5">
+                  <div className={`inline-flex items-center space-x-1.5 px-2.5 py-1 rounded-md text-xs font-bold border ${analysis.conflictStatus.badgeClass}`}>
+                    <span>{analysis.conflictStatus.icon}</span>
+                    <span>{analysis.conflictStatus.label}</span>
+                  </div>
+                </div>
+
+                {/* Conflict Resolution Details (Always transparently shown when conflict is focused) */}
+                {focusedConflict ? (
+                  <div className="bg-slate-50 rounded-lg p-3 text-xs space-y-2 border border-slate-200/70">
+                    <div>
+                      <span className="font-bold text-slate-700 block text-[10px] uppercase tracking-wider">What changes?</span>
+                      <span className="text-slate-800 font-medium">{analysis.whatChanges}</span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-700 block text-[10px] uppercase tracking-wider">Which request is moved?</span>
+                      <span className="text-slate-800">{analysis.movedItem}</span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-700 block text-[10px] uppercase tracking-wider">New time slot / resource</span>
+                      <span className="font-mono font-bold text-railway-blue">{analysis.newTimingOrResource}</span>
+                    </div>
+                    {analysis.compatibility && (
+                      <div>
+                        <span className="font-bold text-slate-700 block text-[10px] uppercase tracking-wider">Compatibility</span>
+                        <span className="text-slate-800">{analysis.compatibility}</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="font-bold text-slate-700 block text-[10px] uppercase tracking-wider">Impact / Trade-off</span>
+                      <span className="text-amber-900 font-medium">{analysis.impactTradeOff}</span>
+                    </div>
+                    <div>
+                      <span className="font-bold text-slate-700 block text-[10px] uppercase tracking-wider">Expected result</span>
+                      <span className="text-emerald-800 font-medium">{analysis.expectedResult}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-slate-50 rounded-lg p-2.5 text-xs text-slate-600 border border-slate-100">
+                    <span className="text-[11px] text-slate-500">Corridor Strategy Focus:</span>
+                    <p className="font-medium text-slate-800 mt-0.5">{analysis.whatChanges}</p>
+                  </div>
+                )}
               </div>
 
-              <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-4 gap-1 text-center text-xs">
-                <div>
-                  <span className="text-[10px] text-slate-400 block font-semibold">Scheduled</span>
-                  <strong className="text-slate-900 font-mono text-xs">{p.scheduled_count}</strong>
+              {/* Bottom Strip: Stats & Action Button */}
+              <div className="mt-4 pt-3 border-t border-slate-100 space-y-3">
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-1 text-center text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-semibold">Scheduled</span>
+                    <strong className="text-slate-900 font-mono text-xs">{p.scheduled_count}</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-semibold">Asset Uptime</span>
+                    <strong className="text-emerald-700 font-mono text-xs">{p.asset_availability_pct || 96.8}%</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-semibold">Utilisation</span>
+                    <strong className="text-railway-blue font-mono text-xs">{p.utilization_rate}%</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block font-semibold">Coverage</span>
+                    <strong className="text-purple-700 font-mono text-xs">{p.critical_coverage}%</strong>
+                  </div>
                 </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block font-semibold">Asset Uptime</span>
-                  <strong className="text-emerald-700 font-mono text-xs">{p.asset_availability_pct || 96.8}%</strong>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block font-semibold">Utilisation</span>
-                  <strong className="text-railway-blue font-mono text-xs">{p.utilization_rate}%</strong>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block font-semibold">Coverage</span>
-                  <strong className="text-purple-700 font-mono text-xs">{p.critical_coverage}%</strong>
-                </div>
+
+                {/* Apply Action Button */}
+                {focusedConflict ? (
+                  <button
+                    type="button"
+                    disabled={isResolving}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleApplyPlanForConflict(p);
+                    }}
+                    className={`w-full py-2 px-3 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition cursor-pointer shadow-xs ${
+                      isAppliedForThisConflict
+                        ? "bg-emerald-600 hover:bg-emerald-700 text-white"
+                        : isSelected
+                        ? "bg-railway-blue hover:bg-blue-700 text-white"
+                        : "bg-slate-900 hover:bg-slate-800 text-white"
+                    }`}
+                  >
+                    {isResolving ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : isAppliedForThisConflict ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                    ) : (
+                      <Zap className="w-3.5 h-3.5 text-amber-300" />
+                    )}
+                    <span>
+                      {isAppliedForThisConflict
+                        ? "✓ Plan Applied (Resolved)"
+                        : `Apply ${p.plan_id.toUpperCase().startsWith("PLAN-A") ? "Plan A" : p.plan_id.toUpperCase().startsWith("PLAN-B") ? "Plan B" : "Plan C"} & Resolve`}
+                    </span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectPlan(p.plan_id);
+                    }}
+                    className={`w-full py-1.5 px-3 rounded-lg text-xs font-bold transition cursor-pointer ${
+                      isSelected
+                        ? "bg-railway-blue text-white"
+                        : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                    }`}
+                  >
+                    {isSelected ? "Active Plan" : `Select ${p.plan_id}`}
+                  </button>
+                )}
               </div>
-            </button>
+            </div>
           );
         })}
       </div>

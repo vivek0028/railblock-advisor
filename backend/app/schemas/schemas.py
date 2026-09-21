@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator, ConfigD
 
 VALID_DEPARTMENTS = {"Engineering", "S&T", "Traction"}
 VALID_CRITICALITY = {"Critical", "High", "Medium", "Low"}
-VALID_STATUS = {"Pending", "Scheduled", "Deferred", "In_Progress", "Completed"}
+VALID_STATUS = {"Pending", "Scheduled", "Deferred", "In_Progress", "Completed", "Approved"}
 VALID_ASSET_TYPES = {"Track", "Signal", "OHE", "Bridge", "Telecom", "Point Machine"}
 
 class MaintenanceTaskBase(BaseModel):

@@ -205,17 +205,36 @@ def detect_all_conflicts(db: Session, persist: bool = True) -> List[Dict[str, An
 
     # Persist to database if requested
     if persist:
+        existing_resolved = {
+            c.conflict_id: c for c in db.query(Conflict).filter(Conflict.status == "Resolved").all()
+        }
         db.query(Conflict).delete()
         for c in conflicts:
+            c_id = c["conflict_id"]
+            if c_id in existing_resolved:
+                prev = existing_resolved[c_id]
+                c_status = "Resolved"
+                c_strat = getattr(prev, "resolution_strategy", None)
+                c_res_at = getattr(prev, "resolved_at", None)
+                c_notes = getattr(prev, "resolution_notes", None)
+            else:
+                c_status = c["status"]
+                c_strat = None
+                c_res_at = None
+                c_notes = None
+
             db_conflict = Conflict(
-                conflict_id=c["conflict_id"],
+                conflict_id=c_id,
                 conflict_type=c["conflict_type"],
                 severity=c["severity"],
                 affected_tasks=c["affected_tasks"],
                 affected_trains=c["affected_trains"],
                 explanation=c["explanation"],
                 suggested_resolution=c["suggested_resolution"],
-                status=c["status"],
+                status=c_status,
+                resolution_strategy=c_strat,
+                resolved_at=c_res_at,
+                resolution_notes=c_notes,
                 data_label="DEMO DATA"
             )
             db.add(db_conflict)

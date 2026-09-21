@@ -16,7 +16,8 @@ import {
   Check,
   X,
   Layers,
-  ShieldAlert
+  ShieldAlert,
+  RotateCcw
 } from "lucide-react";
 import { api } from "../services/api";
 import { ConflictItem, MaintenanceTask, TrainMovement } from "../types";
@@ -28,11 +29,11 @@ export const ConflictDetectionPage: React.FC = () => {
   const [trains, setTrains] = useState<TrainMovement[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDetecting, setIsDetecting] = useState(false);
+  const [viewTab, setViewTab] = useState<"ACTIVE" | "RESOLVED">("ACTIVE");
   const [activeCategory, setActiveCategory] = useState<string>("ALL");
   const [severityFilter, setSeverityFilter] = useState<string>("ALL");
   const [notification, setNotification] = useState<string | null>(null);
   const [selectedConflict, setSelectedConflict] = useState<ConflictItem | null>(null);
-  const [resolvedIds, setResolvedIds] = useState<Set<string>>(new Set());
   const [resolvingConflict, setResolvingConflict] = useState<ConflictItem | null>(null);
   const [resolutionStrategy, setResolutionStrategy] = useState<"bundling" | "stagger" | "crew">("bundling");
   const [isSolving, setIsSolving] = useState(false);
@@ -77,16 +78,22 @@ export const ConflictDetectionPage: React.FC = () => {
     if (!resolvingConflict) return;
     setIsSolving(true);
     try {
+      const planStrategy =
+        resolutionStrategy === "bundling"
+          ? "PLAN_C_BUNDLING"
+          : resolutionStrategy === "stagger"
+          ? "PLAN_B_TRAIN_IMPACT"
+          : "PLAN_A_CRITICAL";
+
       const res = await api.generateOptimizationPlans({
-        strategy_type: "ALL",
+        strategy_type: planStrategy,
         allow_bundling: resolutionStrategy === "bundling",
         additional_crew_count: resolutionStrategy === "crew" ? 2 : 0,
         block_duration_bonus_hours: resolutionStrategy === "stagger" ? 1.0 : 0
       });
       const generatedPlan = res.plans?.[0];
-      const planName = generatedPlan?.plan_id || "PLAN-JOINT-COORDINATED";
+      const planName = generatedPlan?.plan_id || "PLAN-COORDINATED";
 
-      setResolvedIds(prev => new Set(prev).add(resolvingConflict.conflict_id));
       const strategyLabel =
         resolutionStrategy === "bundling"
           ? "Joint Corridor Bundling"
@@ -94,7 +101,17 @@ export const ConflictDetectionPage: React.FC = () => {
           ? "Timetable Window Staggering (+2 hrs)"
           : "Auxiliary Division Gang Reallocation";
 
-      setNotification(`Conflict ${resolvingConflict.conflict_id} successfully resolved via ${strategyLabel}! Coordinated Plan ${planName} generated.`);
+      // Persist directly to backend database
+      await api.resolveConflict(resolvingConflict.conflict_id, {
+        resolution_strategy: strategyLabel,
+        applied_plan_id: planName,
+        resolution_notes: `Resolved via ${strategyLabel}. Applied Plan ${planName}.`
+      });
+
+      // Reload conflicts from backend to ensure consistent state
+      await loadConflicts();
+
+      setNotification(`Conflict ${resolvingConflict.conflict_id} successfully resolved via ${strategyLabel}! Moved to Resolved archive.`);
       setResolvingConflict(null);
       setTimeout(() => setNotification(null), 6000);
     } catch (err: any) {
@@ -104,19 +121,35 @@ export const ConflictDetectionPage: React.FC = () => {
     }
   };
 
-  // Category counts
+  const handleReopenConflict = async (conflictId: string) => {
+    try {
+      await api.reopenConflict(conflictId);
+      await loadConflicts();
+      setNotification(`Conflict ${conflictId} reopened to Active queue.`);
+      setTimeout(() => setNotification(null), 5000);
+    } catch (err: any) {
+      alert(`Failed to reopen conflict: ${err.message}`);
+    }
+  };
+
+  const activeConflicts = useMemo(() => conflicts.filter(c => c.status !== "Resolved"), [conflicts]);
+  const resolvedConflicts = useMemo(() => conflicts.filter(c => c.status === "Resolved"), [conflicts]);
+
+  // Category counts based on ACTIVE conflicts
   const categoryCounts = useMemo(() => {
+    const list = activeConflicts;
     return {
-      Time: conflicts.filter(c => c.conflict_type === "Timetable" || c.conflict_type === "Duration").length,
-      Resource: conflicts.filter(c => c.conflict_type === "Resource").length,
-      Location: conflicts.filter(c => c.conflict_type === "Location").length,
-      Operational: conflicts.filter(c => c.conflict_type === "Timetable" && c.affected_trains && c.affected_trains.length > 0).length,
-      Dependency: conflicts.filter(c => c.conflict_type === "Dependency").length,
+      Time: list.filter(c => c.conflict_type === "Timetable" || c.conflict_type === "Duration").length,
+      Resource: list.filter(c => c.conflict_type === "Resource").length,
+      Location: list.filter(c => c.conflict_type === "Location").length,
+      Operational: list.filter(c => c.conflict_type === "Timetable" && c.affected_trains && c.affected_trains.length > 0).length,
+      Dependency: list.filter(c => c.conflict_type === "Dependency").length,
     };
-  }, [conflicts]);
+  }, [activeConflicts]);
 
   const filteredConflicts = useMemo(() => {
-    return conflicts.filter(c => {
+    const pool = viewTab === "ACTIVE" ? activeConflicts : resolvedConflicts;
+    return pool.filter(c => {
       // Category filter
       let matchesCat = true;
       if (activeCategory === "Time") {
@@ -136,7 +169,7 @@ export const ConflictDetectionPage: React.FC = () => {
 
       return matchesCat && matchesSev;
     });
-  }, [conflicts, activeCategory, severityFilter]);
+  }, [activeConflicts, resolvedConflicts, viewTab, activeCategory, severityFilter]);
 
   // Dynamic side-by-side activity parser for rich GovTech card view
   const parseConflictEntities = (c: ConflictItem) => {
@@ -322,20 +355,59 @@ export const ConflictDetectionPage: React.FC = () => {
         })}
       </div>
 
-      {/* Filter and Status Sub-bar */}
+      {/* Active vs Resolved Mode Switcher and Filter Sub-bar */}
       <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-xs flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center space-x-3">
-          <span className="font-semibold text-slate-700">Filter Severity:</span>
-          <select
-            value={severityFilter}
-            onChange={(e) => setSeverityFilter(e.target.value)}
-            className="border border-slate-300 rounded-lg px-2.5 py-1 bg-white font-medium focus:ring-2 focus:ring-railway-blue"
-          >
-            <option value="ALL">All Severities</option>
-            <option value="Critical">Critical (Hard Conflict)</option>
-            <option value="Warning">Warning (Soft Bottleneck)</option>
-            <option value="Attention">Attention (Advisory)</option>
-          </select>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Active / Resolved Tabs */}
+          <div className="flex items-center bg-slate-100 p-1 rounded-lg border border-slate-200">
+            <button
+              onClick={() => setViewTab("ACTIVE")}
+              className={`px-3 py-1.5 rounded-md font-bold text-xs transition cursor-pointer flex items-center space-x-1.5 ${
+                viewTab === "ACTIVE"
+                  ? "bg-white text-rose-700 shadow-2xs font-black"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-rose-600" />
+              <span>Active Conflicts</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                viewTab === "ACTIVE" ? "bg-rose-100 text-rose-800" : "bg-slate-200 text-slate-700"
+              }`}>
+                {activeConflicts.length}
+              </span>
+            </button>
+
+            <button
+              onClick={() => setViewTab("RESOLVED")}
+              className={`px-3 py-1.5 rounded-md font-bold text-xs transition cursor-pointer flex items-center space-x-1.5 ${
+                viewTab === "RESOLVED"
+                  ? "bg-white text-emerald-700 shadow-2xs font-black"
+                  : "text-slate-600 hover:text-slate-900"
+              }`}
+            >
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Resolved Archive</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                viewTab === "RESOLVED" ? "bg-emerald-100 text-emerald-800" : "bg-slate-200 text-slate-700"
+              }`}>
+                {resolvedConflicts.length}
+              </span>
+            </button>
+          </div>
+
+          <div className="flex items-center space-x-2 pl-2 border-l border-slate-200">
+            <span className="font-semibold text-slate-700">Filter:</span>
+            <select
+              value={severityFilter}
+              onChange={(e) => setSeverityFilter(e.target.value)}
+              className="border border-slate-300 rounded-lg px-2.5 py-1 bg-white font-medium focus:ring-2 focus:ring-railway-blue"
+            >
+              <option value="ALL">All Severities</option>
+              <option value="Critical">Critical (Hard Conflict)</option>
+              <option value="Warning">Warning (Soft Bottleneck)</option>
+              <option value="Attention">Attention (Advisory)</option>
+            </select>
+          </div>
 
           {activeCategory !== "ALL" && (
             <button
@@ -348,7 +420,7 @@ export const ConflictDetectionPage: React.FC = () => {
         </div>
 
         <span className="font-mono text-slate-500 text-xs font-semibold">
-          Showing <strong>{filteredConflicts.length}</strong> conflicts
+          Showing <strong>{filteredConflicts.length}</strong> {viewTab === "ACTIVE" ? "active" : "resolved"} conflicts
         </span>
       </div>
 
@@ -363,7 +435,7 @@ export const ConflictDetectionPage: React.FC = () => {
         ) : (
           filteredConflicts.map((c) => {
             const entities = parseConflictEntities(c);
-            const isResolved = resolvedIds.has(c.conflict_id);
+            const isResolved = c.status === "Resolved";
 
             return (
               <div
@@ -465,30 +537,63 @@ export const ConflictDetectionPage: React.FC = () => {
                   </div>
 
                   {/* Action Buttons: Review, Resolve, View Details */}
-                  <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-slate-100">
-                    <button
-                      onClick={() => setSelectedConflict(c)}
-                      className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition"
-                    >
-                      View Details
-                    </button>
-                    <button
-                      onClick={() => {
-                        setResolvingConflict(c);
-                        setResolutionStrategy("bundling");
-                      }}
-                      className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Resolve</span>
-                    </button>
-                    <button
-                      onClick={() => navigate("/optimizer")}
-                      className="px-3.5 py-1.5 bg-railway-blue hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
-                    >
-                      <span>Review in Optimizer</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </button>
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <div>
+                      {c.status === "Resolved" && (
+                        <span className="text-[11px] text-emerald-800 font-medium flex items-center space-x-1">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Resolved via <strong>{c.resolution_strategy || "Applied Plan"}</strong></span>
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => setSelectedConflict(c)}
+                        className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-semibold transition cursor-pointer"
+                      >
+                        View Details
+                      </button>
+
+                      {c.status === "Resolved" ? (
+                        <>
+                          <button
+                            onClick={() => handleReopenConflict(c.conflict_id)}
+                            className="px-3 py-1.5 bg-white border border-rose-300 hover:bg-rose-50 text-rose-700 rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" />
+                            <span>Reopen Conflict</span>
+                          </button>
+                          <button
+                            onClick={() => navigate(`/optimizer?conflictId=${c.conflict_id}`, { state: { conflictId: c.conflict_id, conflict: c } })}
+                            className="px-3.5 py-1.5 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+                          >
+                            <span>Review in Optimizer</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => {
+                              setResolvingConflict(c);
+                              setResolutionStrategy("bundling");
+                            }}
+                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+                          >
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Resolve</span>
+                          </button>
+                          <button
+                            onClick={() => navigate(`/optimizer?conflictId=${c.conflict_id}`, { state: { conflictId: c.conflict_id, conflict: c } })}
+                            className="px-3.5 py-1.5 bg-railway-blue hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition flex items-center space-x-1 cursor-pointer"
+                          >
+                            <span>Review in Optimizer</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>

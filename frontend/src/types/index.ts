@@ -73,6 +73,9 @@ export interface ConflictItem {
   explanation: string;
   suggested_resolution: string;
   status: string;
+  resolution_strategy?: string | null;
+  resolved_at?: string | null;
+  resolution_notes?: string | null;
 }
 
 export interface PlanKPIs {

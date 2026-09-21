@@ -139,7 +139,10 @@ export const ExplainabilityPage: React.FC = () => {
         setConflicts(conflictsData);
 
         const paramPlanId = searchParams.get("plan") || searchParams.get("planId") || location.state?.planId;
-        const targetPlan = detailedPlans.find(p => p.plan_id === paramPlanId) || detailedPlans[0];
+        const targetPlan =
+          detailedPlans.find(p => p.plan_id === paramPlanId) ||
+          detailedPlans.find(p => p.status === "Approved") ||
+          detailedPlans[0];
         if (targetPlan) {
           setActivePlanId(targetPlan.plan_id);
         }

@@ -131,6 +131,36 @@ export const api = {
       method: "POST"
     }),
 
+  resolveConflict: (
+    conflictId: string,
+    data?: {
+      resolution_strategy?: string;
+      applied_plan_id?: string;
+      resolution_notes?: string;
+    }
+  ) =>
+    fetchJson<{
+      status: string;
+      conflict_id: string;
+      new_status: string;
+      resolution_strategy?: string;
+      resolved_at?: string;
+      message: string;
+    }>(`/api/conflicts/${conflictId}/resolve`, {
+      method: "PATCH",
+      body: JSON.stringify(data || {})
+    }),
+
+  reopenConflict: (conflictId: string) =>
+    fetchJson<{
+      status: string;
+      conflict_id: string;
+      new_status: string;
+      message: string;
+    }>(`/api/conflicts/${conflictId}/reopen`, {
+      method: "PATCH"
+    }),
+
   // Optimisation Plans
   getOptimizationPlans: () => fetchJson<SchedulePlan[]>("/api/optimization/plans"),
 

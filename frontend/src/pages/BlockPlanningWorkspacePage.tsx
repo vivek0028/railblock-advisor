@@ -39,7 +39,8 @@ export const BlockPlanningWorkspacePage: React.FC = () => {
       setTasks(tasksData);
       setBlocks(blocksData);
       if (plansData.length > 0) {
-        const fullPlan = await api.getOptimizationPlanById(plansData[0].plan_id);
+        const chosenPlan = plansData.find((p: SchedulePlan) => p.status === "Approved") || plansData[0];
+        const fullPlan = await api.getOptimizationPlanById(chosenPlan.plan_id);
         setActivePlan(fullPlan);
       }
     } catch (err: any) {

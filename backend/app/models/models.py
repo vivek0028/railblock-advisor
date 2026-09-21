@@ -123,6 +123,9 @@ class Conflict(Base):
     explanation = Column(Text, nullable=False)
     suggested_resolution = Column(Text, nullable=False)
     status = Column(String(30), default="Active")       # Active, Resolved, Ignored
+    resolution_strategy = Column(String(100), nullable=True) # e.g. PLAN_A_CRITICAL, PLAN_B_TRAIN, PLAN_C_BUNDLE
+    resolved_at = Column(DateTime, nullable=True)
+    resolution_notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     data_label = Column(String(50), default="DEMO DATA")
 

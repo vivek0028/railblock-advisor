@@ -62,6 +62,7 @@ interface TimelineBlockItem {
   department: string;
   taskId: string;
   blockId: string;
+  assignedResource?: string;
   bundledWith?: string[];
   notes?: string;
   date: string;
@@ -151,13 +152,24 @@ export const DashboardPage: React.FC = () => {
       setBlockWindows(blocksData);
 
       if (plansData.length > 0) {
-        const fullPlan = await api.getOptimizationPlanById(plansData[0].plan_id);
+        // Prioritize Approved Plan so timetable immediately displays approved master schedule
+        const chosenPlan = plansData.find((p: SchedulePlan) => p.status === "Approved") || plansData[0];
+        const fullPlan = await api.getOptimizationPlanById(chosenPlan.plan_id);
         setActivePlan(fullPlan);
       }
     } catch (err: any) {
       setError(err.message || "Failed to load dashboard data from backend.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSwitchActivePlan = async (planId: string) => {
+    try {
+      const fullPlan = await api.getOptimizationPlanById(planId);
+      setActivePlan(fullPlan);
+    } catch (err: any) {
+      console.error("Failed to switch plan on dashboard:", err);
     }
   };
 
@@ -183,6 +195,11 @@ export const DashboardPage: React.FC = () => {
         const dateKey = asgn.block.date;
         const dept = asgn.task.department;
         const isApproved = activePlan.status === "Approved";
+        const resList = asgn.task.required_resources;
+        const resourceStr = Array.isArray(resList) && resList.length > 0
+          ? resList.join(", ")
+          : `${asgn.task.department} Section Team`;
+
         const blockItem: TimelineBlockItem = {
           id: asgn.assignment_id,
           activity: asgn.task.description || asgn.task.asset_type,
@@ -193,6 +210,7 @@ export const DashboardPage: React.FC = () => {
           department: dept,
           taskId: asgn.task.task_id,
           blockId: asgn.block.block_id,
+          assignedResource: resourceStr,
           bundledWith: asgn.bundled_with,
           notes: asgn.task.criticality === "Critical" ? "Critical Safety Asset" : undefined,
           date: dateKey
@@ -522,143 +540,222 @@ export const DashboardPage: React.FC = () => {
 
       {/* 3. DYNAMIC SCHEDULE VIEW: WEEK VIEW VS MONTH VIEW */}
       {activeSectionTab === "schedule" && (
-        activeViewMode === "WEEK" ? (
-          /* WEEKLY BLOCK TIMELINE */
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
-            <div>
-              <div className="flex items-center space-x-2">
-                <Calendar className="w-4 h-4 text-railway-blue" />
-                <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                  Weekly Block Timeline (Week 38: 18 - 24 Sep 2026)
-                </h2>
-                <span className="bg-blue-50 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded font-mono border border-blue-200">
-                  Gantt Matrix
-                </span>
+        <div className="space-y-3">
+          {/* MASTER TIMETABLE SYNCHRONIZATION STATUS BANNER */}
+          <div
+            className={`rounded-xl border p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-2xs transition ${
+              activePlan?.status === "Approved"
+                ? "bg-emerald-50/90 border-emerald-300 text-emerald-950"
+                : "bg-slate-50 border-slate-200 text-slate-800"
+            }`}
+          >
+            <div className="flex items-center space-x-3">
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 shadow-2xs ${
+                  activePlan?.status === "Approved" ? "bg-emerald-600 text-white" : "bg-slate-200 text-slate-600"
+                }`}
+              >
+                {activePlan?.status === "Approved" ? <CheckCircle2 className="w-5 h-5" /> : <Clock className="w-5 h-5" />}
               </div>
-              <p className="text-[11px] text-slate-500 mt-0.5">
-                Visual corridor occupancy schedule coordinated across Engineering, S&T, and Traction departments
-              </p>
-            </div>
-
-            {/* Status Legend */}
-            <div className="flex items-center space-x-3 text-[10px] font-bold text-slate-600">
-              <span className="inline-flex items-center">
-                <span className="w-2 h-2 rounded bg-blue-600 mr-1" /> Scheduled
-              </span>
-              <span className="inline-flex items-center">
-                <span className="w-2 h-2 rounded bg-amber-500 mr-1" /> Conflict
-              </span>
-              <span className="inline-flex items-center">
-                <span className="w-2 h-2 rounded bg-emerald-600 mr-1" /> Approved
-              </span>
-            </div>
-          </div>
-
-          {/* Horizontal Timeline Grid */}
-          <div className="overflow-x-auto">
-            <div className="min-w-[800px] border border-slate-200 rounded-xl overflow-hidden text-xs">
-              {/* Day Header Columns */}
-              <div className="grid grid-cols-8 bg-slate-100/90 border-b border-slate-200 text-center font-bold text-slate-700 py-2.5 text-[11px]">
-                <div className="text-left px-3 text-slate-500 uppercase tracking-wider text-[10px] font-black">
-                  Department
-                </div>
-                {DAYS_OF_WEEK.map((d) => (
-                  <div key={d.key} className="border-l border-slate-200 px-1">
-                    <span className="block font-black text-slate-900">{d.name}</span>
-                    <span className="block text-[10px] font-medium text-slate-500 font-mono">{d.dateStr}</span>
-                  </div>
-                ))}
-              </div>
-
-              {/* Department Rows */}
-              {DEPARTMENTS.map((dept, idx) => {
-                const deptBadge =
-                  dept === "Engineering"
-                    ? "bg-blue-100 text-blue-800 border-blue-200"
-                    : dept === "S&T"
-                    ? "bg-purple-100 text-purple-800 border-purple-200"
-                    : "bg-amber-100 text-amber-800 border-amber-200";
-
-                return (
-                  <div
-                    key={dept}
-                    className={`grid grid-cols-8 border-b border-slate-200 min-h-[96px] ${
-                      idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+              <div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <span
+                    className={`text-[10px] font-mono font-black px-2 py-0.5 rounded uppercase ${
+                      activePlan?.status === "Approved"
+                        ? "bg-emerald-200/90 text-emerald-900 border border-emerald-300 font-black"
+                        : "bg-slate-200 text-slate-700"
                     }`}
                   >
-                    {/* Department Label Cell */}
-                    <div className="p-3 flex flex-col justify-center border-r border-slate-200 bg-slate-50/80">
-                      <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${deptBadge}`}>
-                        {dept}
-                      </span>
-                      <span className="text-[10px] text-slate-500 mt-1 font-mono font-medium">
-                        {dept === "Engineering" && "Track / Civil"}
-                        {dept === "S&T" && "Signals & Tele"}
-                        {dept === "Traction" && "25kV OHE"}
-                      </span>
-                    </div>
+                    {activePlan?.status === "Approved" ? "✓ SANCTIONED & APPROVED TIMETABLE" : "OPTIMIZATION PROPOSAL"}
+                  </span>
+                  <span className="font-extrabold text-xs text-slate-900">
+                    {activePlan?.plan_name} ({activePlan?.plan_id})
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  {activePlan?.status === "Approved" ? (
+                    <>
+                      Sanctioned by <strong>{activePlan.approved_by || "Railway Operations"}</strong>. Synchronized across Weekly & Monthly Timetable, TMS, SMMS, TDMS.
+                    </>
+                  ) : (
+                    <>
+                      Generated via OR-Tools CP-SAT. Review conflicts or proceed to Approval to make this the active timetable.
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
 
-                    {/* Day Cells for this Department */}
-                    {DAYS_OF_WEEK.map((day) => {
-                      const blocks = timelineGrid[day.key]?.[dept] || [];
-                      return (
-                        <div
-                          key={day.key}
-                          className="p-1.5 border-r border-slate-200/80 flex flex-col gap-1.5 justify-center"
-                        >
-                          {blocks.length === 0 ? (
-                            <div className="h-full min-h-[60px] border border-dashed border-slate-200/90 rounded-lg flex flex-col items-center justify-center text-[10px] text-slate-400 font-medium p-1 text-center">
-                              <span>Clear for Traffic</span>
-                            </div>
-                          ) : (
-                            blocks.map((b) => (
-                              <button
-                                key={b.id}
-                                onClick={() => setSelectedBlockItem(b)}
-                                className={`w-full text-left p-2 rounded-lg border transition shadow-2xs hover:shadow-xs cursor-pointer ${
-                                  b.status === "Approved"
-                                    ? "bg-emerald-50 border-emerald-300 text-emerald-950"
-                                    : "bg-blue-50/90 border-blue-200 text-blue-950"
-                                }`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="font-mono font-bold text-[11px]">{b.blockId}</span>
-                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-white/80 border border-slate-200">
-                                    {b.timeWindow}
-                                  </span>
-                                </div>
-                                <div className="font-bold text-[11px] truncate mt-1 text-slate-900">
-                                  {b.activity}
-                                </div>
-                                <div className="text-[10px] text-slate-500 font-mono mt-0.5 flex items-center justify-between">
-                                  <span>{b.section}</span>
-                                  <div className="flex items-center space-x-1">
-                                    {b.bundledWith && b.bundledWith.length > 0 ? (
-                                      <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-purple-100 text-purple-800 border border-purple-200">
-                                        Joint ({b.bundledWith.length})
-                                      </span>
-                                    ) : (
-                                      <span className="text-[9px] font-medium px-1 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
-                                        Solo
-                                      </span>
-                                    )}
-                                    <span className="font-bold">{b.durationHours}h</span>
-                                  </div>
-                                </div>
-                              </button>
-                            ))
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
+            <div className="flex items-center space-x-2 self-start sm:self-auto flex-shrink-0">
+              <span className="text-[11px] font-bold text-slate-600">Active Plan:</span>
+              <select
+                value={activePlan?.plan_id}
+                onChange={(e) => handleSwitchActivePlan(e.target.value)}
+                className="border border-slate-300 rounded-lg px-2.5 py-1.5 bg-white text-xs font-bold text-slate-800 focus:ring-2 focus:ring-railway-blue cursor-pointer shadow-2xs"
+              >
+                {plans.map((p) => (
+                  <option key={p.plan_id} value={p.plan_id}>
+                    {p.status === "Approved" ? "✓ [Approved] " : ""}{p.plan_id} — {p.plan_name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-        </div>
-      ) : (
+
+          {activeViewMode === "WEEK" ? (
+            /* WEEKLY BLOCK TIMELINE */
+            <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <Calendar className="w-4 h-4 text-railway-blue" />
+                    <h2 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Weekly Block Timeline (Week 38: 18 - 24 Sep 2026)
+                    </h2>
+                    <span className="bg-blue-50 text-blue-800 text-[10px] font-bold px-2 py-0.5 rounded font-mono border border-blue-200">
+                      Gantt Matrix
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Visual corridor occupancy schedule coordinated across Engineering, S&T, and Traction departments
+                  </p>
+                </div>
+
+                {/* Status Legend */}
+                <div className="flex items-center space-x-3 text-[10px] font-bold text-slate-600">
+                  <span className="inline-flex items-center">
+                    <span className="w-2 h-2 rounded bg-blue-600 mr-1" /> Scheduled
+                  </span>
+                  <span className="inline-flex items-center">
+                    <span className="w-2 h-2 rounded bg-amber-500 mr-1" /> Conflict
+                  </span>
+                  <span className="inline-flex items-center">
+                    <span className="w-2 h-2 rounded bg-emerald-600 mr-1" /> Approved
+                  </span>
+                </div>
+              </div>
+
+              {/* Horizontal Timeline Grid */}
+              <div className="overflow-x-auto">
+                <div className="min-w-[800px] border border-slate-200 rounded-xl overflow-hidden text-xs">
+                  {/* Day Header Columns */}
+                  <div className="grid grid-cols-8 bg-slate-100/90 border-b border-slate-200 text-center font-bold text-slate-700 py-2.5 text-[11px]">
+                    <div className="text-left px-3 text-slate-500 uppercase tracking-wider text-[10px] font-black">
+                      Department
+                    </div>
+                    {DAYS_OF_WEEK.map((d) => (
+                      <div key={d.key} className="border-l border-slate-200 px-1">
+                        <span className="block font-black text-slate-900">{d.name}</span>
+                        <span className="block text-[10px] font-medium text-slate-500 font-mono">{d.dateStr}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Department Rows */}
+                  {DEPARTMENTS.map((dept, idx) => {
+                    const deptBadge =
+                      dept === "Engineering"
+                        ? "bg-blue-100 text-blue-800 border-blue-200"
+                        : dept === "S&T"
+                        ? "bg-purple-100 text-purple-800 border-purple-200"
+                        : "bg-amber-100 text-amber-800 border-amber-200";
+
+                    return (
+                      <div
+                        key={dept}
+                        className={`grid grid-cols-8 border-b border-slate-200 min-h-[96px] ${
+                          idx % 2 === 0 ? "bg-white" : "bg-slate-50/40"
+                        }`}
+                      >
+                        {/* Department Label Cell */}
+                        <div className="p-3 flex flex-col justify-center border-r border-slate-200 bg-slate-50/80">
+                          <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${deptBadge}`}>
+                            {dept}
+                          </span>
+                          <span className="text-[10px] text-slate-500 mt-1 font-mono font-medium">
+                            {dept === "Engineering" && "Track / Civil"}
+                            {dept === "S&T" && "Signals & Tele"}
+                            {dept === "Traction" && "25kV OHE"}
+                          </span>
+                        </div>
+
+                        {/* Day Cells for this Department */}
+                        {DAYS_OF_WEEK.map((day) => {
+                          const blocks = timelineGrid[day.key]?.[dept] || [];
+                          return (
+                            <div
+                              key={day.key}
+                              className="p-1.5 border-r border-slate-200/80 flex flex-col gap-1.5 justify-center"
+                            >
+                              {blocks.length === 0 ? (
+                                <div className="h-full min-h-[60px] border border-dashed border-slate-200/90 rounded-lg flex flex-col items-center justify-center text-[10px] text-slate-400 font-medium p-1 text-center">
+                                  <span>Clear for Traffic</span>
+                                </div>
+                              ) : (
+                                blocks.map((b) => (
+                                  <button
+                                    key={b.id}
+                                    onClick={() => setSelectedBlockItem(b)}
+                                    className={`w-full text-left p-2 rounded-lg border transition shadow-2xs hover:shadow-xs cursor-pointer ${
+                                      b.status === "Approved"
+                                        ? "bg-emerald-50/90 border-emerald-300 text-emerald-950"
+                                        : "bg-blue-50/90 border-blue-200 text-blue-950"
+                                    }`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <div className="flex items-center space-x-1">
+                                        <span className="font-mono font-black text-[11px] text-slate-800">{b.taskId || b.blockId}</span>
+                                        {b.status === "Approved" ? (
+                                          <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-emerald-600 text-white font-mono uppercase">
+                                            ✓ Appr
+                                          </span>
+                                        ) : (
+                                          <span className="text-[8px] font-bold px-1 py-0.2 rounded bg-blue-100 text-blue-800 font-mono uppercase">
+                                            Sched
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-white/90 border border-slate-200 text-slate-800">
+                                        {b.timeWindow}
+                                      </span>
+                                    </div>
+                                    <div className="font-bold text-[11px] truncate mt-1 text-slate-900" title={b.activity}>
+                                      {b.activity}
+                                    </div>
+                                    {b.assignedResource && (
+                                      <div className="text-[10px] text-slate-600 truncate mt-0.5 flex items-center space-x-1 font-medium">
+                                        <Wrench className="w-2.5 h-2.5 text-slate-400 flex-shrink-0" />
+                                        <span className="truncate">{b.assignedResource}</span>
+                                      </div>
+                                    )}
+                                    <div className="text-[10px] text-slate-500 font-mono mt-1 pt-1 border-t border-slate-200/60 flex items-center justify-between">
+                                      <span>{b.section}</span>
+                                      <div className="flex items-center space-x-1">
+                                        {b.bundledWith && b.bundledWith.length > 0 ? (
+                                          <span className="text-[9px] font-bold px-1 py-0.2 rounded bg-purple-100 text-purple-800 border border-purple-200">
+                                            Joint ({b.bundledWith.length})
+                                          </span>
+                                        ) : (
+                                          <span className="text-[9px] font-medium px-1 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                            Solo
+                                          </span>
+                                        )}
+                                        <span className="font-bold">{b.durationHours}h</span>
+                                      </div>
+                                    </div>
+                                  </button>
+                                ))
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ) : (
         /* MONTHLY CALENDAR VIEW (30 DAYS) */
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 gap-2">
@@ -779,18 +876,39 @@ export const DashboardPage: React.FC = () => {
                   <button
                     key={b.id}
                     onClick={() => setSelectedBlockItem(b)}
-                    className="p-3 bg-white rounded-lg border border-slate-200 shadow-2xs hover:border-blue-300 text-left transition cursor-pointer"
+                    className={`p-3 rounded-lg border text-left transition cursor-pointer shadow-2xs hover:shadow-xs ${
+                      b.status === "Approved"
+                        ? "bg-emerald-50/70 border-emerald-300"
+                        : "bg-white border-slate-200 hover:border-blue-300"
+                    }`}
                   >
                     <div className="flex items-center justify-between">
-                      <span className="font-mono font-bold text-slate-900 text-[11px]">{b.blockId}</span>
-                      <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-800">
-                        {b.department}
+                      <div className="flex items-center space-x-1.5">
+                        <span className="font-mono font-bold text-slate-900 text-[11px]">{b.taskId || b.blockId}</span>
+                        {b.status === "Approved" ? (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-emerald-600 text-white font-mono uppercase">
+                            ✓ Approved
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-100 text-blue-800">
+                            {b.department}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-mono font-bold text-slate-800 text-[10px] bg-white px-1.5 py-0.2 rounded border border-slate-200">
+                        {b.timeWindow}
                       </span>
                     </div>
                     <div className="font-bold text-slate-900 text-xs mt-1 truncate">{b.activity}</div>
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 font-mono mt-2 pt-1 border-t border-slate-100">
+                    {b.assignedResource && (
+                      <div className="text-[10px] text-slate-600 truncate mt-1 flex items-center space-x-1 font-medium">
+                        <Wrench className="w-2.5 h-2.5 text-slate-400 flex-shrink-0" />
+                        <span>{b.assignedResource}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono mt-2 pt-1 border-t border-slate-100">
                       <span>{b.section}</span>
-                      <span className="font-bold text-slate-900">{b.timeWindow}</span>
+                      <span>{b.durationHours} hrs</span>
                     </div>
                   </button>
                 ))}
@@ -798,7 +916,9 @@ export const DashboardPage: React.FC = () => {
             )}
           </div>
         </div>
-      ))}
+          )}
+        </div>
+      )}
 
       {/* 4. MODERN CHARTS & INSIGHTS ROW (PIE CHART + BAR CHART + PLANNING INSIGHTS) */}
       {activeSectionTab === "analytics" && (
@@ -1070,7 +1190,9 @@ export const DashboardPage: React.FC = () => {
                 <span className="text-[10px] font-bold text-slate-400 uppercase font-mono">
                   BLOCK OCCUPANCY INSPECTOR
                 </span>
-                <h3 className="font-extrabold text-base text-slate-900">{selectedBlockItem.blockId}</h3>
+                <h3 className="font-extrabold text-base text-slate-900">
+                  {selectedBlockItem.taskId} <span className="text-slate-400 font-normal">({selectedBlockItem.blockId})</span>
+                </h3>
               </div>
               <button
                 onClick={() => setSelectedBlockItem(null)}
@@ -1081,19 +1203,33 @@ export const DashboardPage: React.FC = () => {
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 space-y-2">
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-2">
                 <div className="flex justify-between items-center">
                   <span className="font-bold text-slate-900 text-sm">{selectedBlockItem.activity}</span>
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-800">
-                    {selectedBlockItem.status}
+                  <span
+                    className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                      selectedBlockItem.status === "Approved"
+                        ? "bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold"
+                        : "bg-blue-100 text-blue-800"
+                    }`}
+                  >
+                    {selectedBlockItem.status === "Approved" ? "✓ Approved Schedule" : "Scheduled"}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 text-slate-600 font-mono text-[11px] pt-1 border-t border-slate-200">
+                <div className="grid grid-cols-2 gap-2 text-slate-600 font-mono text-[11px] pt-1.5 border-t border-slate-200">
+                  <div>Request ID: <strong className="text-slate-900 font-bold">{selectedBlockItem.taskId}</strong></div>
                   <div>Department: <strong>{selectedBlockItem.department}</strong></div>
                   <div>Section: <strong>{selectedBlockItem.section}</strong></div>
-                  <div>Time Window: <strong>{selectedBlockItem.timeWindow}</strong></div>
+                  <div>Time Window: <strong className="text-railway-blue">{selectedBlockItem.timeWindow}</strong></div>
                   <div>Duration: <strong>{selectedBlockItem.durationHours} hrs</strong></div>
+                  <div>Date: <strong>{selectedBlockItem.date}</strong></div>
                 </div>
+                {selectedBlockItem.assignedResource && (
+                  <div className="pt-1.5 border-t border-slate-200/80 text-[11px]">
+                    <span className="text-slate-500 font-medium">Assigned Resource: </span>
+                    <strong className="text-slate-900 font-bold">{selectedBlockItem.assignedResource}</strong>
+                  </div>
+                )}
               </div>
 
               {selectedBlockItem.bundledWith && selectedBlockItem.bundledWith.length > 0 && (

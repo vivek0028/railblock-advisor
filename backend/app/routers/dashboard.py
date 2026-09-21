@@ -19,12 +19,15 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
     tasks = db.query(MaintenanceTask).all()
     blocks = db.query(BlockWindow).all()
     conflicts = db.query(Conflict).all()
-    latest_plan = db.query(SchedulePlan).order_by(SchedulePlan.created_at.desc()).first()
+    approved_plan = db.query(SchedulePlan).filter(SchedulePlan.status == "Approved").order_by(SchedulePlan.approved_at.desc()).first()
+    latest_plan = approved_plan or db.query(SchedulePlan).order_by(SchedulePlan.created_at.desc()).first()
     recent_logs = db.query(AuditLog).order_by(AuditLog.timestamp.desc()).limit(8).all()
 
     total_tasks = len(tasks)
     critical_or_high = sum(1 for t in tasks if t.criticality in ["Critical", "High"] or t.overdue)
-    active_conflicts = len(conflicts)
+    active_conf_list = [c for c in conflicts if c.status != "Resolved"]
+    resolved_conflicts = sum(1 for c in conflicts if c.status == "Resolved")
+    active_conflicts = len(active_conf_list)
 
     if latest_plan:
         scheduled_tasks = latest_plan.scheduled_count
@@ -52,16 +55,17 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
         "Low": sum(1 for t in tasks if t.priority_score < 35)
     }
 
-    # Conflict breakdown
+    # Conflict breakdown (active only)
     conflict_summary = {
-        "total": len(conflicts),
-        "critical": sum(1 for c in conflicts if c.severity == "Critical"),
-        "warning": sum(1 for c in conflicts if c.severity == "Warning"),
-        "timetable": sum(1 for c in conflicts if c.conflict_type == "Timetable"),
-        "resource": sum(1 for c in conflicts if c.conflict_type == "Resource"),
-        "location": sum(1 for c in conflicts if c.conflict_type == "Location"),
-        "dependency": sum(1 for c in conflicts if c.conflict_type == "Dependency"),
-        "duration": sum(1 for c in conflicts if c.conflict_type == "Duration")
+        "total": active_conflicts,
+        "resolved_total": resolved_conflicts,
+        "critical": sum(1 for c in active_conf_list if c.severity == "Critical"),
+        "warning": sum(1 for c in active_conf_list if c.severity == "Warning"),
+        "timetable": sum(1 for c in active_conf_list if c.conflict_type == "Timetable"),
+        "resource": sum(1 for c in active_conf_list if c.conflict_type == "Resource"),
+        "location": sum(1 for c in active_conf_list if c.conflict_type == "Location"),
+        "dependency": sum(1 for c in active_conf_list if c.conflict_type == "Dependency"),
+        "duration": sum(1 for c in active_conf_list if c.conflict_type == "Duration")
     }
 
     # Critical tasks requiring attention (overdue or score >= 80)
@@ -100,6 +104,7 @@ def get_dashboard_summary(db: Session = Depends(get_db)):
             "total_maintenance_requests": total_tasks,
             "high_priority_tasks": critical_or_high,
             "conflicts_detected": active_conflicts,
+            "resolved_conflicts": resolved_conflicts,
             "scheduled_tasks": scheduled_tasks,
             "deferred_tasks": deferred_tasks,
             "block_utilisation_rate": utilization_rate,

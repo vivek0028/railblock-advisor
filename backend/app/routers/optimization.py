@@ -4,11 +4,13 @@ from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import case
 
 from app.database import get_db
 from app.models.models import SchedulePlan, ScheduleAssignment, MaintenanceTask, BlockWindow, AuditLog
 from app.services.optimizer import RailBlockOptimizer
 from app.services.conflict_engine import detect_all_conflicts
+from app.services.plan_committer import commit_approved_plan_schedule
 
 router = APIRouter(tags=["Optimization Engine"])
 
@@ -157,7 +159,10 @@ def generate_optimization_plans(
 @router.get("/api/optimisation")
 @router.get("/api/plans")
 def list_optimization_plans(db: Session = Depends(get_db)):
-    plans = db.query(SchedulePlan).order_by(SchedulePlan.created_at.desc()).all()
+    plans = db.query(SchedulePlan).order_by(
+        case((SchedulePlan.status == "Approved", 0), else_=1),
+        SchedulePlan.created_at.desc()
+    ).all()
     if not plans:
         # Generate initial plans if none exist
         gen_res = generate_optimization_plans(None, db)
@@ -310,39 +315,28 @@ def approve_plan(
     req: ApprovalRequest,
     db: Session = Depends(get_db)
 ):
-    plan = db.query(SchedulePlan).filter(SchedulePlan.plan_id == plan_id).first()
-    if not plan:
+    try:
+        plan = commit_approved_plan_schedule(
+            plan_id=plan_id,
+            db=db,
+            user_name=req.user_name,
+            user_role=req.user_role,
+            comments=req.comments
+        )
+    except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Plan '{plan_id}' not found."
+            detail=str(e)
         )
-
-    prev_status = plan.status
-    plan.status = "Approved"
-    plan.approved_by = f"{req.user_name} ({req.user_role})"
-    plan.approved_at = datetime.utcnow()
-
-    # Log to audit trail
-    audit_entry = AuditLog(
-        log_id=f"AUD-APPR-{plan_id[:8]}-{uuid.uuid4().hex[:6]}",
-        user_role=req.user_role,
-        action="Plan Approved",
-        target_id=plan_id,
-        target_type="PLAN",
-        details=f"Plan '{plan.plan_name}' approved by {req.user_name}. Comments: {req.comments}",
-        status_change=f"{prev_status} -> Approved"
-    )
-    db.add(audit_entry)
-    db.commit()
 
     return {
         "status": "success",
-        "message": f"Plan '{plan.plan_name}' ({plan_id}) approved successfully.",
+        "message": f"Plan '{plan.plan_name}' ({plan_id}) approved successfully and committed to master corridor timetable.",
         "plan_id": plan_id,
         "new_status": "Approved",
         "approved_by": plan.approved_by,
-        "approved_at": plan.approved_at.isoformat(),
-        "disclaimer": "Final operational execution remains with authorised railway block personnel."
+        "approved_at": plan.approved_at.isoformat() if plan.approved_at else None,
+        "disclaimer": "Schedule synchronized across Weekly Timetable, Monthly Timetable, Tasks, and Conflicts."
     }
 
 @router.post("/api/plans/{plan_id}/reject", status_code=status.HTTP_200_OK)
