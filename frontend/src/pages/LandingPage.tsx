@@ -1,7 +1,6 @@
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
-  Train,
   ShieldAlert,
   Layers,
   Cpu,
@@ -58,11 +57,6 @@ export const LandingPage: React.FC = () => {
         <div className="absolute bottom-0 left-1/3 w-80 h-80 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none" />
 
         <div className="max-w-4xl space-y-4 relative z-10">
-          <div className="inline-flex items-center space-x-2 bg-blue-500/20 text-blue-200 border border-blue-400/30 px-3.5 py-1.5 rounded-full text-xs font-bold tracking-wide">
-            <Train className="w-4 h-4 text-blue-300" />
-            <span>Smart India Hackathon 2026 &bull; Problem Statement 26027</span>
-          </div>
-
           <h1 className="text-3xl sm:text-5xl font-black tracking-tight text-white leading-tight">
             RailOptiBlock
           </h1>
