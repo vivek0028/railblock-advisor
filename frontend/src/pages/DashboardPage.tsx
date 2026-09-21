@@ -21,7 +21,8 @@ import {
   BarChart3,
   CalendarDays,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  RotateCcw
 } from "lucide-react";
 import {
   PieChart,
@@ -170,6 +171,22 @@ export const DashboardPage: React.FC = () => {
       setActivePlan(fullPlan);
     } catch (err: any) {
       console.error("Failed to switch plan on dashboard:", err);
+    }
+  };
+
+  const handleClearApproval = async () => {
+    if (!window.confirm("Are you sure you want to clear the approved timetable? All scheduled tasks and block windows will be reverted to unallocated status.")) {
+      return;
+    }
+    try {
+      setLoading(true);
+      await api.clearPlanApproval(activePlan?.plan_id);
+      await loadData();
+    } catch (err: any) {
+      console.error("Failed to clear approval:", err);
+      setError(err.message || "Failed to clear approval.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -599,6 +616,17 @@ export const DashboardPage: React.FC = () => {
                   </option>
                 ))}
               </select>
+              {activePlan?.status === "Approved" && (
+                <button
+                  type="button"
+                  onClick={handleClearApproval}
+                  className="inline-flex items-center space-x-1 px-2.5 py-1.5 rounded-lg border border-rose-200 bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-bold transition shadow-2xs cursor-pointer"
+                  title="Clear approved timetable and revert to draft status"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Clear Approval</span>
+                </button>
+              )}
             </div>
           </div>
 

@@ -10,7 +10,7 @@ from app.database import get_db
 from app.models.models import SchedulePlan, ScheduleAssignment, MaintenanceTask, BlockWindow, AuditLog
 from app.services.optimizer import RailBlockOptimizer
 from app.services.conflict_engine import detect_all_conflicts
-from app.services.plan_committer import commit_approved_plan_schedule
+from app.services.plan_committer import commit_approved_plan_schedule, clear_approved_plan_schedule
 
 router = APIRouter(tags=["Optimization Engine"])
 
@@ -375,3 +375,18 @@ def reject_plan(
         "new_status": "Rejected",
         "reason": req.reason
     }
+
+@router.post("/api/plans/{plan_id}/clear-approval", status_code=status.HTTP_200_OK)
+def clear_plan_approval(
+    plan_id: str,
+    db: Session = Depends(get_db)
+):
+    result = clear_approved_plan_schedule(db=db, plan_id=plan_id)
+    return result
+
+@router.post("/api/plans/clear-approval", status_code=status.HTTP_200_OK)
+def clear_all_approved_plans(
+    db: Session = Depends(get_db)
+):
+    result = clear_approved_plan_schedule(db=db, plan_id=None)
+    return result

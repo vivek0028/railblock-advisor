@@ -203,6 +203,12 @@ export const api = {
       body: JSON.stringify(data)
     }),
 
+  clearPlanApproval: (planId?: string) =>
+    fetchJson<{ status: string; message: string; cleared_plans: string[] }>(
+      planId ? `/api/plans/${planId}/clear-approval` : `/api/plans/clear-approval`,
+      { method: "POST" }
+    ),
+
   // What-If Simulation
   runSimulation: (params: {
     block_duration_bonus_hours: number;

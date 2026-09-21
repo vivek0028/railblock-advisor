@@ -109,3 +109,58 @@ def commit_approved_plan_schedule(
     db.refresh(plan)
 
     return plan
+
+def clear_approved_plan_schedule(
+    db: Session,
+    plan_id: Optional[str] = None,
+    user_name: str = "Chief Controller (COA)",
+    user_role: str = "Operational Controller"
+) -> dict:
+    """
+    Clears any approved timetable plan and resets tasks, blocks, and plans back to draft/generated status.
+    """
+    query = db.query(SchedulePlan)
+    if plan_id:
+        plans = query.filter(SchedulePlan.plan_id == plan_id).all()
+    else:
+        plans = query.filter(SchedulePlan.status.in_(["Approved", "Superseded"])).all()
+
+    cleared_plan_ids = []
+    for p in plans:
+        prev_status = p.status
+        p.status = "Generated"
+        p.approved_by = None
+        p.approved_at = None
+        cleared_plan_ids.append(p.plan_id)
+
+    # Reset tasks that were marked Approved or Deferred
+    tasks = db.query(MaintenanceTask).filter(MaintenanceTask.status.in_(["Approved", "Deferred"])).all()
+    for t in tasks:
+        t.status = "Pending"
+        t.assigned_block_id = None
+
+    # Reset block windows marked Approved
+    blocks = db.query(BlockWindow).filter(BlockWindow.status == "Approved").all()
+    for b in blocks:
+        b.status = "Available"
+
+    # Audit log entry
+    audit_entry = AuditLog(
+        log_id=f"AUD-CLR-{uuid.uuid4().hex[:8]}",
+        user_role=user_role,
+        action="Master Timetable Approval Cleared",
+        target_id=plan_id or "ALL_APPROVED",
+        target_type="PLAN",
+        details=f"Cleared approved status for plans: {cleared_plan_ids}. All tasks reset to Pending and block windows to Available by {user_name}.",
+        status_change="Approved -> Generated"
+    )
+    db.add(audit_entry)
+    db.commit()
+
+    return {
+        "status": "success",
+        "message": "Approved timetable cleared. Tasks and block windows returned to unallocated state.",
+        "cleared_plans": cleared_plan_ids,
+        "reset_tasks_count": len(tasks),
+        "reset_blocks_count": len(blocks)
+    }

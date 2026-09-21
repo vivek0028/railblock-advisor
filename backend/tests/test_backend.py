@@ -505,6 +505,24 @@ def test_approved_plan_timetable_schedule_sync():
     dash_data = res_dash.json()
     assert dash_data["kpis"]["scheduled_tasks"] == plans[0]["scheduled_count"]
 
+def test_clear_plan_approval():
+    # 1. Clear approval
+    res_clear = client.post("/api/plans/clear-approval")
+    assert res_clear.status_code == 200
+    data = res_clear.json()
+    assert data["status"] == "success"
+
+    # 2. Verify no plans have status 'Approved'
+    res_plans = client.get("/api/optimization/plans")
+    assert res_plans.status_code == 200
+    for p in res_plans.json():
+        assert p["status"] != "Approved"
+
+    # 3. Verify no tasks remain in 'Approved' status
+    res_tasks = client.get("/api/tasks?status=Approved")
+    assert res_tasks.status_code == 200
+    assert len(res_tasks.json()) == 0
+
 
 
 
